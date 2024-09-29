@@ -28,6 +28,13 @@ Modern workflow management system optimized for data pipelines.
 - Growing ecosystem of integrations
 - https://www.prefect.io/, founded in 2018, originated from Jeremiah Lowin's work at Airbnb (Airflow)
 
+Specific advantages for this project:
+- Low startup cost, with ability to transition to self-hosting
+- Simple workflows, like this warehouse, handled using straightforward components without unnecessary complexity
+
+Disadvantages:
+- Server auth and https handled separately
+
 ### Airflow
 Mature orchestration tool with robust scheduling and extensive integrations.
 - Directed acyclic graphs (DAGs) provide clear visual representation of data flows

@@ -1,3 +1,9 @@
+# Overview
+
+Here is a diagram to understand the relationship between Prefect Flows, Deployments, and Workers from their 2.10.15 documentation (https://docs-2.prefect.io/2.10.15/concepts/work-pools/):
+
+![Prefect Deployment End-to-End](prefect-flow-deployment-end-to-end.png "Prefect Deployment End-to-End")
+
 # Prefect Flows
 
 This are the individual processes that do the ingest. Typically, they are simple files that wrap a shell process.. Key points:

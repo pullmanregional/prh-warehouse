@@ -24,7 +24,7 @@ This are the individual processes that do the ingest. Typically, they are simple
 
 # Prefect Work Pool and Worker
 
-This spawns an actual process that polls the Prefect Server for work to do, and spawns subprocesses to run flows. Each deployment (see above) is assigned to a work pool.
+Starting Prefect Worker creates an actual process that polls the Prefect Server for work to do, and spawns subprocesses to run flows. Each deployment (see above) is assigned to a work pool.
 
 Start a long running worker in the pool to activate it:
 ```
@@ -32,5 +32,26 @@ prefect work-pool create ingest
 prefect worker start --pool "ingest"
 ```
 
-We start our worker as a systemd process by defining `/etc/systemd/system/prefect-worker.service`. The worker will by default concurrently spawn one subprocess per CPU to run any scheduled flows in parallel.
+# Prefect Worker Systemd Service
 
+In production our worker runs as a systemd daemon by defining `/etc/systemd/system/prefect-worker.service`. The worker will by default concurrently spawn one subprocess per CPU to run any scheduled flows in parallel.
+
+Install this service to `/etc/systemd/system/prefect-worker-ingest.service`
+
+Set permissions:
+```
+sudo chmod 644 /etc/systemd/system/prefect-worker-ingest.service
+```
+
+Then start the service with:
+````
+sudo systemctl daemon-reload
+sudo systemctl enable prefect-worker-ingest.service
+sudo systemctl start prefect-worker-ingest.service
+sudo systemctl status prefect-worker-ingest.service
+```
+
+Follow logs with:
+```
+journalctl -fu prefect-worker-ingest.service
+```

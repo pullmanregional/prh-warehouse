@@ -1,0 +1,22 @@
+# Install this service to /etc/systemd/system/prefect-worker-ingest.service
+# with permissions:
+#  sudo chmod 644 /etc/systemd/system/prefect-worker-ingest.service
+#
+# Then start the service with:
+#  sudo systemctl daemon-reload
+#  sudo systemctl enable prefect-worker-ingest.service
+#  sudo systemctl start prefect-worker-ingest.service
+#  sudo systemctl status prefect-worker-ingest.service
+
+[Unit]
+Description=Prefect Worker for ingest pool
+
+[Service]
+User=jlee
+WorkingDirectory=/home/jlee/prh-warehouse
+EnvironmentFile=/home/jlee/prh-warehouse/prefect/.env
+ExecStart=/home/jlee/.pyenv/shims/prefect worker start --pool "ingest"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

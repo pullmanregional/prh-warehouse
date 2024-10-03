@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 # Load environment from .env file, does not overwrite existing env variables
 load_dotenv()
-PREFECT_DATA_HOME = os.environ.get("PREFECT_DATA_HOME", Path.cwd())
+PREFECT_DATA_HOME = Path(os.environ.get("PREFECT_DATA_HOME", Path.cwd()))
 
 if __name__ == "__main__":
     flows = []

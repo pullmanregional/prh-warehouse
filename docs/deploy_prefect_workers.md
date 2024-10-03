@@ -6,7 +6,7 @@ Here is a diagram to understand the relationship between Prefect Flows, Deployme
 
 # Prefect Flows
 
-This are the individual processes that do the ingest. Typically, they are simple files that wrap a shell process.. Key points:
+This are the individual processes that do the ingest. Typically, they are simple files that wrap a shell process. Key points:
 
 * The Prefect flows are defined in individual projects, such as `prh-dash` and `clinic-cal`.
 * Each project has a `prefect` dir containing the defined flows
@@ -16,6 +16,41 @@ This are the individual processes that do the ingest. Typically, they are simple
   cd clinic-cal
   CLINIC_CAL_EPIC_SOURCE_FILE=/path/to/local.xlsx python prefect/clinic-cal-epic-ingest.py
   ```
+
+### Special cases:
+
+For flows that need `pipenv` to install dependencies, like `prh-dash`:
+
+* All imports by the **flow script itself** need to be pip installed in the Worker's environment. For example:
+  ```
+  # In prh-dash/prefect/prh-dash-ingest.py:
+
+  from prefect_shell import ShellOperation
+  from prefect_aws import AwsCredentials, S3Bucket
+  ```
+
+  Before this will execute, do this on the Worker VM:
+  ```
+  su - deploy
+  pip install "prefect[shell,aws]"
+  ```
+* Then, the actual code, like `prh-dash/ingest.py`, that is called in `ShellOperation` requires `pipenv install` to run. This is the first step in `prh-dash-ingest.py`:
+  ```
+  with ShellOperation(
+    commands=[
+        "pipenv install",
+        ...
+  ```
+
+  If we don't reuse a single virtualenv for all runs, the disk will be littered with a >800MB venv for each run. To avoid, set the venv name:
+
+  ```
+  # In prh-dash/prefect/.env:
+
+  PIPENV_CUSTOM_VENV_NAME=prefect-prh-dash
+  ```
+  This makes all `ShellOperation` `pipenv ...` statements use this specific venv. 
+
 
 # Prefect Deployments
 

@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <TargetDatabaseName>prw</TargetDatabaseName>
+    <TargetConnectionString>Data Source=prw.database.windows.net;Initial Catalog=prw;User ID=deploy;Password=******;Connect Timeout=30;Encrypt=True;Trust Server Certificate=False;Authentication=SqlPassword;Application Name=azdata;Command Timeout=30</TargetConnectionString>
+    <AllowIncompatiblePlatform>True</AllowIncompatiblePlatform>
+    <DropPermissionsNotInSource>True</DropPermissionsNotInSource>
+    <DropObjectsNotInSource>True</DropObjectsNotInSource>
+    <DropRoleMembersNotInSource>True</DropRoleMembersNotInSource>
+    <IgnoreKeywordCasing>False</IgnoreKeywordCasing>
+    <IgnoreSemicolonBetweenStatements>False</IgnoreSemicolonBetweenStatements>
+    <AllowDropBlockingAssemblies>True</AllowDropBlockingAssemblies>
+    <ProfileVersionNumber>1</ProfileVersionNumber>
+  </PropertyGroup>
+</Project>

@@ -1,2 +1,6 @@
 # Python
 __pycache__
+
+# Azure Data Studio build files
+ads/bin
+ads/obj

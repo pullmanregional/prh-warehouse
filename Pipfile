@@ -10,6 +10,7 @@ cryptography = "*"
 python-dotenv = "*"
 pandas = "*"
 pyodbc = "*"
+prefect = {extras = ["shell"], version = "*"}
 
 [dev-packages]
 black = "*"

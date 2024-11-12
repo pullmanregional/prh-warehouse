@@ -1,6 +1,10 @@
 # Python
 __pycache__
 
+# Data files
+ingest/data/*
+ingest/*.sqlite3
+
 # Azure Data Studio build files
 ads/bin
 ads/obj

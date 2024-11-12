@@ -4,6 +4,7 @@ import argparse
 import urllib
 import re
 import pandas as pd
+from typing import List
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from sqlmodel import Session, create_engine, delete
@@ -36,8 +37,7 @@ PRW_DB_ODBC = os.environ.get("PRW_DB_ODBC", "sqlite:///prw.sqlite3")
 PRW_ID_DB_ODBC = os.environ.get("PRW_ID_DB_ODBC", "sqlite:///prw_id.sqlite3")
 
 # Input files
-DEFAULT_DATA_DIR = "./"
-ENCOUNTERS_FILENAME = "encounters.xlsx"
+DEFAULT_DATA_DIR = "./data"
 
 # Other internal configuration
 SHOW_SQL_IN_LOG = False
@@ -46,7 +46,7 @@ SHOW_SQL_IN_LOG = False
 # -------------------------------------------------------
 # Extract from Source Files
 # -------------------------------------------------------
-def sanity_check_data_dir(base_path, encounters_file):
+def sanity_check_data_dir(base_path, encounters_files):
     """
     Executed once at the beginning of ingest to validate data directory and files
     meet basic requirements.
@@ -54,8 +54,10 @@ def sanity_check_data_dir(base_path, encounters_file):
     error = None
     if not os.path.isdir(base_path):
         error = f"ERROR: data directory path does not exist: {base_path}"
-    if not os.path.isfile(encounters_file):
-        error = f"ERROR: data file missing: {encounters_file}"
+
+    for encounters_file in encounters_files:
+        if not os.path.isfile(encounters_file):
+            error = f"ERROR: data file missing: {encounters_file}"
 
     if error is not None:
         print(error)
@@ -63,12 +65,15 @@ def sanity_check_data_dir(base_path, encounters_file):
     return error is None
 
 
-def read_encounters(filename):
+def read_encounters(files: List[str]):
     # -------------------------------------------------------
     # Extract data from first sheet from excel worksheet
     # -------------------------------------------------------
-    logging.info(f"Reading {filename}")
-    df = pd.read_excel(filename, sheet_name=0, usecols="A:V", header=0)
+    logging.info(f"Reading {files}")
+    df = pd.DataFrame()
+    for file in files:
+        part = pd.read_excel(file, sheet_name=0, usecols="A:V", header=0)
+        df = pd.concat([df, part])
 
     # Rename columns to match the required column names
     df.rename(
@@ -165,27 +170,22 @@ def read_encounters(filename):
     return patients_df, encounters_df
 
 
-def write_meta(engine, modified):
+def write_meta(session, modified):
     """
     Populate the meta and sources_meta tables with updated times
     """
     logging.info("Writing metadata")
-    with Session(engine) as session:
-        # Clear metadata tables
-        session.exec(delete(prw_model.PrwMeta))
-        session.exec(delete(prw_model.PrwSourcesMeta))
+    # Clear metadata tables
+    session.exec(delete(prw_model.PrwMeta))
+    session.exec(delete(prw_model.PrwSourcesMeta))
 
-        # Set last ingest time and other metadata fields
-        session.add(prw_model.PrwMeta(modified=datetime.now()))
+    # Set last ingest time and other metadata fields
+    session.add(prw_model.PrwMeta(modified=datetime.now()))
 
-        # Store last modified timestamps for ingested files
-        for file, modified_time in modified.items():
-            sources_meta = prw_model.PrwSourcesMeta(
-                filename=file, modified=modified_time
-            )
-            session.add(sources_meta)
-
-        session.commit()
+    # Store last modified timestamps for ingested files
+    for file, modified_time in modified.items():
+        sources_meta = prw_model.PrwSourcesMeta(filename=file, modified=modified_time)
+        session.add(sources_meta)
 
 
 # -------------------------------------------------------
@@ -213,32 +213,40 @@ def get_db_connection(odbc_str):
         return None
 
 
-def write_tables_to_db(engine, tables_data):
-    with Session(engine) as session:
-        for table_data in tables_data:
-            logging.info(f"Writing data to table: {table_data.table.__tablename__}")
+def clear_tables(session, tables):
+    """
+    Delete all rows from specified tables
+    """
+    for table in tables:
+        logging.info(f"Clearing table: {table.__tablename__}")
+        session.exec(delete(table))
 
-            # Clear data in DB
-            session.exec(delete(table_data.table))
 
-            # Select columns from dataframe that match table columns, except "id" column
-            table_columns = table_data.table.__table__.columns.keys()
-            table_columns.remove("id")
+def write_tables_to_db(session, tables_data):
+    """
+    Write data from dataframes to DB tables
+    """
+    for table_data in tables_data:
+        logging.info(f"Writing data to table: {table_data.table.__tablename__}")
 
-            # Remove columns that aren't in the dataframe
-            table_columns = [
-                col for col in table_columns if col in table_data.df.columns
-            ]
+        # Clear data in DB
+        session.exec(delete(table_data.table))
 
-            # Write data from dataframe
-            df = table_data.df[table_columns]
-            df.to_sql(
-                name=table_data.table.__tablename__,
-                con=session.connection(),
-                if_exists="append",
-                index=False,
-            )
-        session.commit()
+        # Select columns from dataframe that match table columns, except "id" column
+        table_columns = table_data.table.__table__.columns.keys()
+        table_columns.remove("id")
+
+        # Remove columns that aren't in the dataframe
+        table_columns = [col for col in table_columns if col in table_data.df.columns]
+
+        # Write data from dataframe
+        df = table_data.df[table_columns]
+        df.to_sql(
+            name=table_data.table.__tablename__,
+            con=session.connection(),
+            if_exists="append",
+            index=False,
+        )
 
 
 # -------------------------------------------------------
@@ -253,6 +261,12 @@ def mask_pw(odbc_str):
     return masked_str
 
 
+def get_excel_files(dir_path):
+    return [
+        os.path.join(dir_path, f) for f in os.listdir(dir_path) if f.endswith(".xlsx")
+    ]
+
+
 # -------------------------------------------------------
 # Main entry point
 # -------------------------------------------------------
@@ -261,7 +275,7 @@ def parse_arguments():
     parser.add_argument(
         "-i",
         "--input_dir",
-        help="Path to the source data directory",
+        help="Path to the source data directory. All .xlsx files in the directory will be read.",
         default=DEFAULT_DATA_DIR,
     )
     parser.add_argument(
@@ -284,38 +298,41 @@ def main():
 
     # Load config from cmd line
     args = parse_arguments()
-    base_path = args.input_dir
+    dir_path = args.input_dir
     output_odbc = args.output
     id_output_odbc = args.idoutput if args.idoutput.lower() != "none" else None
     logging.info(
-        f"Data dir: {base_path}, output: {mask_pw(output_odbc)}, id output: {mask_pw(id_output_odbc or "None")}"
+        f"Data dir: {dir_path}, output: {mask_pw(output_odbc)}, id output: {mask_pw(id_output_odbc or "None")}"
     )
 
     # Source file paths
-    encounters_file = os.path.join(base_path, ENCOUNTERS_FILENAME)
-    source_files = [encounters_file]
-    logging.info(f"Source files: {source_files}")
+    encounters_files = get_excel_files(dir_path)
+    logging.info(f"Source files: {encounters_files}")
 
     # Sanity check data directory expected location and files
-    if not sanity_check_data_dir(base_path, encounters_file):
+    if not sanity_check_data_dir(dir_path, encounters_files):
         logging.error("ERROR: data directory error (see above). Terminating.")
         exit(1)
 
     # Read source files into memory
-    patients_df, encounters_df = read_encounters(encounters_file)
+    patients_df, encounters_df = read_encounters(encounters_files)
 
     # Get connection to output DBs
     prw_engine = get_db_connection(output_odbc)
     if prw_engine is None:
         logging.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
+    prw_session = Session(prw_engine)
 
     # Create tables if they do not exist
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
+    # Explicitly drop data in tables in order for foreign key constraints to be met
+    clear_tables(prw_session, [prw_model.PrwEncounter, prw_model.PrwPatient])
+
     # Write into DB
     write_tables_to_db(
-        prw_engine,
+        prw_session,
         [
             TableData(table=prw_model.PrwPatient, df=patients_df),
             TableData(table=prw_model.PrwEncounter, df=encounters_df),
@@ -324,20 +341,26 @@ def main():
 
     # Update last ingest time and modified times for source data files
     modified = {
-        file: datetime.fromtimestamp(os.path.getmtime(file)) for file in source_files
+        file: datetime.fromtimestamp(os.path.getmtime(file))
+        for file in encounters_files
     }
-    write_meta(prw_engine, modified)
+    write_meta(prw_session, modified)
 
     # Cleanup
+    prw_session.commit()
+    prw_session.close()
     prw_engine.dispose()
 
     # Write ID data to separate DB if provided
     prw_id_engine = get_db_connection(id_output_odbc) if id_output_odbc else None
     if prw_id_engine:
+        prw_id_session = Session(prw_id_engine)
         prw_id_model.PrwIdModel.metadata.create_all(prw_id_engine)
         write_tables_to_db(
-            prw_id_engine, [TableData(table=prw_id_model.PrwId, df=patients_df)]
+            prw_id_session, [TableData(table=prw_id_model.PrwId, df=patients_df)]
         )
+        prw_id_session.commit()
+        prw_id_session.close()
         prw_id_engine.dispose()
 
     logging.info("Done")

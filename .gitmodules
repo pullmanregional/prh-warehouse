@@ -1,0 +1,3 @@
+[submodule "ingest/prw-model"]
+	path = ingest/prw-model
+	url = https://github.com/pullmanregional/prw-model.git

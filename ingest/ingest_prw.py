@@ -11,8 +11,8 @@ from sqlmodel import Session, create_engine, delete
 from dotenv import load_dotenv
 from dataclasses import dataclass
 from sqlmodel import SQLModel
-from model import prw_model
-from model import prw_id_model
+from prw_model import prw_model
+from prw_model import prw_id_model
 from model import prw_id
 
 
@@ -302,7 +302,7 @@ def main():
     output_odbc = args.output
     id_output_odbc = args.idoutput if args.idoutput.lower() != "none" else None
     logging.info(
-        f"Data dir: {dir_path}, output: {mask_pw(output_odbc)}, id output: {mask_pw(id_output_odbc or "None")}"
+        f"Data dir: {dir_path}, output: {mask_pw(output_odbc)}, id output: {mask_pw(id_output_odbc or 'None')}"
     )
 
     # Source file paths

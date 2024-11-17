@@ -11,8 +11,7 @@ from sqlmodel import Session, create_engine, delete
 from dotenv import load_dotenv
 from dataclasses import dataclass
 from sqlmodel import SQLModel
-from prw_model import prw_model
-from prw_model import prw_id_model
+from prw_model import prw_model, prw_id_model
 from model import prw_id
 
 
@@ -184,7 +183,7 @@ def write_meta(session, modified):
 
     # Store last modified timestamps for ingested files
     for file, modified_time in modified.items():
-        sources_meta = prw_model.PrwSourcesMeta(filename=file, modified=modified_time)
+        sources_meta = prw_model.PrwSourcesMeta(source=file, modified=modified_time)
         session.add(sources_meta)
 
 

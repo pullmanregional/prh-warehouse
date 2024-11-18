@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from dataclasses import dataclass
 from sqlmodel import SQLModel
 from prw_model import prw_model, prw_id_model
-from model import prw_id
+from util import prw_id
 
 
 # -------------------------------------------------------

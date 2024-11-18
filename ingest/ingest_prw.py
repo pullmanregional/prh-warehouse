@@ -4,10 +4,11 @@ import argparse
 import urllib
 import re
 import pandas as pd
-from typing import List
+import warnings
+from typing import List, Tuple
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from sqlmodel import Session, create_engine, delete
+from sqlmodel import Session, create_engine, select, delete, inspect
 from dotenv import load_dotenv
 from dataclasses import dataclass
 from sqlmodel import SQLModel
@@ -64,14 +65,28 @@ def sanity_check_data_dir(base_path, encounters_files):
     return error is None
 
 
-def read_encounters(files: List[str]):
+def read_mrn_to_prw_id_table(engine):
+    """
+    Read existing ID to MRN mapping from the PRW ID DB
+    """
+    with Session(engine) as session:
+        results = session.exec(
+            select(prw_id_model.PrwId.prw_id, prw_id_model.PrwId.mrn)
+        )
+        return pd.DataFrame(results, columns=["prw_id", "mrn"])
+
+
+def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     # -------------------------------------------------------
     # Extract data from first sheet from excel worksheet
     # -------------------------------------------------------
     logging.info(f"Reading {files}")
     df = pd.DataFrame()
     for file in files:
-        part = pd.read_excel(file, sheet_name=0, usecols="A:V", header=0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            part = pd.read_excel(file, sheet_name=0, usecols="A:V", header=0)
+
         df = pd.concat([df, part])
 
     # Rename columns to match the required column names
@@ -137,8 +152,13 @@ def read_encounters(files: List[str]):
     patients_df = patients_df.drop_duplicates(subset=["mrn"], keep="first").copy()
 
     # Calculate prw_id from MRN, and store translation table
-    prw_id.calc_prw_id(patients_df, src_id_col="mrn", id_col="prw_id")
-    mrn_to_prw_id = patients_df[["mrn", "prw_id"]].copy()
+    patients_df = prw_id.calc_prw_id(
+        patients_df,
+        src_id_col="mrn",
+        id_col="prw_id",
+        src_id_to_id_df=mrn_to_prw_id_df,
+    )
+    mrn_to_prw_id_df = patients_df[["mrn", "prw_id"]].copy()
 
     # Calculate age and age_mo from dob
     now = pd.Timestamp.now()
@@ -158,7 +178,7 @@ def read_encounters(files: List[str]):
     # Transform encounters data
     # -------------------------------------------------------
     # Replace MRN with prw_id
-    encounters_df = encounters_df.merge(mrn_to_prw_id, on="mrn", how="left")
+    encounters_df = encounters_df.merge(mrn_to_prw_id_df, on="mrn", how="left")
     encounters_df.drop(columns=["mrn"], inplace=True)
 
     # Force encounter_date to be date only, no time
@@ -174,17 +194,23 @@ def write_meta(session, modified):
     Populate the meta and sources_meta tables with updated times
     """
     logging.info("Writing metadata")
-    # Clear metadata tables
-    session.exec(delete(prw_model.PrwMeta))
-    session.exec(delete(prw_model.PrwSourcesMeta))
 
-    # Set last ingest time and other metadata fields
+    # Clear the metadata table and store now as the last ingest time
+    session.exec(delete(prw_model.PrwMeta))
     session.add(prw_model.PrwMeta(modified=datetime.now()))
 
-    # Store last modified timestamps for ingested files
+    # Store last modified timestamps for ingested files, updating if already exists
     for file, modified_time in modified.items():
         sources_meta = prw_model.PrwSourcesMeta(source=file, modified=modified_time)
-        session.add(sources_meta)
+        existing = session.exec(
+            select(prw_model.PrwSourcesMeta).where(
+                prw_model.PrwSourcesMeta.source == file
+            )
+        ).first()
+        if existing:
+            existing.modified = modified_time
+        else:
+            session.add(sources_meta)
 
 
 # -------------------------------------------------------
@@ -313,8 +339,21 @@ def main():
         logging.error("ERROR: data directory error (see above). Terminating.")
         exit(1)
 
+    # If ID DB is specified, read existing ID mappings
+    prw_id_engine, mrn_to_prw_id_df = None, None
+    if id_output_odbc:
+        prw_id_engine = get_db_connection(id_output_odbc)
+        if prw_id_engine is None:
+            logging.error("ERROR: cannot open ID DB (see above). Terminating.")
+            exit(1)
+        if inspect(prw_id_engine).has_table(prw_id_model.PrwId.__tablename__):
+            logging.info("Using existing MRN to PRW ID mappings")
+            mrn_to_prw_id_df = read_mrn_to_prw_id_table(prw_id_engine)
+        else:
+            logging.info("ID DB table does not exist, will generate new ID mappings")
+
     # Read source files into memory
-    patients_df, encounters_df = read_encounters(encounters_files)
+    patients_df, encounters_df = read_encounters(encounters_files, mrn_to_prw_id_df)
 
     # Get connection to output DBs
     prw_engine = get_db_connection(output_odbc)
@@ -324,6 +363,7 @@ def main():
     prw_session = Session(prw_engine)
 
     # Create tables if they do not exist
+    prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
     # Explicitly drop data in tables in order for foreign key constraints to be met
@@ -351,7 +391,6 @@ def main():
     prw_engine.dispose()
 
     # Write ID data to separate DB if provided
-    prw_id_engine = get_db_connection(id_output_odbc) if id_output_odbc else None
     if prw_id_engine:
         prw_id_session = Session(prw_id_engine)
         prw_id_model.PrwIdModel.metadata.create_all(prw_id_engine)

@@ -33,11 +33,46 @@ def prw_id_ensure_unique(df: pd.DataFrame, id_col="prw_id") -> pd.DataFrame:
     return df
 
 
-def calc_prw_id(df: pd.DataFrame, src_id_col="mrn", id_col="prw_id") -> pd.DataFrame:
+def calc_prw_id(
+    df: pd.DataFrame, src_id_col="mrn", id_col="prw_id", src_id_to_id_df=None
+) -> pd.DataFrame:
     """
     Given a DataFrame with a source ID column, deterministically calculates a unique prw_id column by
     hashing the source ID
     """
-    df[id_col] = df[src_id_col].apply(prw_id_base)
-    prw_id_ensure_unique(df, id_col=id_col)
+    if src_id_to_id_df is not None:
+        src_id_to_id_df = src_id_to_id_df.loc[:, [src_id_col, id_col]]
+        df = df.merge(src_id_to_id_df, on=src_id_col, how="left")
+
+        # For any rows where id_col didn't exist in the given mapping, calculate it, making sure
+        # the new value is unique
+        rows_missing_id = df[id_col].isna()
+        new_ids_df = pd.DataFrame(
+            {
+                src_id_col: df.loc[rows_missing_id, src_id_col],
+                id_col: df.loc[rows_missing_id, src_id_col].apply(prw_id_base),
+            }
+        )
+        prw_id_ensure_unique(new_ids_df, id_col=id_col)
+
+        # Detect collisions where id in new_ids_df was already used in df
+        collisions = new_ids_df[new_ids_df[id_col].isin(df[id_col])]
+        while len(collisions) > 0:
+            # Rehash collisions until all are unique
+            for idx, row in collisions.iterrows():
+                new_ids_df.at[idx, id_col] = str(
+                    fnv.hash(row[id_col].encode(), bits=32)
+                )
+            prw_id_ensure_unique(new_ids_df, id_col=id_col)
+            collisions = new_ids_df[new_ids_df[id_col].isin(df[id_col])]
+
+        # Assign new prw_ids to df by matching on src_id_col
+        df = df.merge(new_ids_df, on=src_id_col, how="left", suffixes=("", "_new"))
+        df[id_col] = df[id_col + "_new"].fillna(df[id_col])
+        df = df.drop(columns=[id_col + "_new"])
+
+    else:
+        df[id_col] = df[src_id_col].apply(prw_id_base)
+        prw_id_ensure_unique(df, id_col=id_col)
+
     return df

@@ -3,8 +3,7 @@ Print the Data Definition Language (DDL) statements for the PRW model.
 """
 
 from sqlalchemy import create_mock_engine
-from prw_model import prw_model
-from prw_model import prw_id_model
+from prw_model import *
 
 
 def dump(sql, *multiparams, **params):
@@ -13,5 +12,7 @@ def dump(sql, *multiparams, **params):
 
 if __name__ == "__main__":
     engine = create_mock_engine("mssql+pyodbc://", dump)
-    prw_model.PrwModel.metadata.create_all(engine, checkfirst=False)
-    prw_id_model.PrwIdModel.metadata.create_all(engine, checkfirst=False)
+    PrwIdModel.metadata.create_all(engine, checkfirst=False)
+    PrwMetaModel.metadata.create_all(engine, checkfirst=False)
+    PrwModel.metadata.create_all(engine, checkfirst=False)
+    PrwFinanceModel.metadata.create_all(engine, checkfirst=False)

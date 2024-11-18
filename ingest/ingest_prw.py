@@ -1,30 +1,19 @@
 import os
 import logging
 import argparse
-import urllib
-import re
-import pandas as pd
 import warnings
-from typing import List, Tuple
+import pandas as pd
+from typing import List
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from sqlmodel import Session, create_engine, select, delete, inspect
+from sqlmodel import Session, select, inspect
 from dotenv import load_dotenv
-from dataclasses import dataclass
-from sqlmodel import SQLModel
 from prw_model import prw_model, prw_id_model
-from util import prw_id
+from util import prw_id, db_utils, util, prw_meta
+from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
 
-
-# -------------------------------------------------------
-# Types
-# -------------------------------------------------------
-# Association of table with its data to update in a DB
-@dataclass
-class TableData:
-    table: SQLModel
-    df: pd.DataFrame
-
+# Unique identifier for this ingest dataset
+INGEST_DATASET_ID = "encounters"
 
 # -------------------------------------------------------
 # Config
@@ -37,10 +26,11 @@ PRW_DB_ODBC = os.environ.get("PRW_DB_ODBC", "sqlite:///prw.sqlite3")
 PRW_ID_DB_ODBC = os.environ.get("PRW_ID_DB_ODBC", "sqlite:///prw_id.sqlite3")
 
 # Input files
-DEFAULT_DATA_DIR = "./data"
+DEFAULT_DATA_DIR = "./data/encounters"
 
-# Other internal configuration
+# Logging configuration
 SHOW_SQL_IN_LOG = False
+logging.basicConfig(level=logging.INFO)
 
 
 # -------------------------------------------------------
@@ -189,114 +179,13 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     return patients_df, encounters_df
 
 
-def write_meta(session, modified):
-    """
-    Populate the meta and sources_meta tables with updated times
-    """
-    logging.info("Writing metadata")
-
-    # Clear the metadata table and store now as the last ingest time
-    session.exec(delete(prw_model.PrwMeta))
-    session.add(prw_model.PrwMeta(modified=datetime.now()))
-
-    # Store last modified timestamps for ingested files, updating if already exists
-    for file, modified_time in modified.items():
-        sources_meta = prw_model.PrwSourcesMeta(source=file, modified=modified_time)
-        existing = session.exec(
-            select(prw_model.PrwSourcesMeta).where(
-                prw_model.PrwSourcesMeta.source == file
-            )
-        ).first()
-        if existing:
-            existing.modified = modified_time
-        else:
-            session.add(sources_meta)
-
-
-# -------------------------------------------------------
-# DB Utilities
-# -------------------------------------------------------
-def get_db_connection(odbc_str):
-    # Split connection string into odbc prefix and parameters (ie everything after odbc_connect=)
-    match = re.search(r"^(.*odbc_connect=)(.*)$", odbc_str)
-    prefix = match.group(1) if match else ""
-    params = match.group(2) if match else ""
-    if prefix and params:
-        # URL escape ODBC connection string
-        conn_str = prefix + urllib.parse.quote_plus(params)
-    else:
-        # No odbc_connect= found, just original string
-        conn_str = odbc_str
-
-    # Use SQLModel to establish connection to DB
-    try:
-        engine = create_engine(conn_str, echo=SHOW_SQL_IN_LOG)
-        return engine
-    except Exception as e:
-        logging.error(f"ERROR: failed to connect to DB")
-        logging.error(e)
-        return None
-
-
-def clear_tables(session, tables):
-    """
-    Delete all rows from specified tables
-    """
-    for table in tables:
-        logging.info(f"Clearing table: {table.__tablename__}")
-        session.exec(delete(table))
-
-
-def write_tables_to_db(session, tables_data):
-    """
-    Write data from dataframes to DB tables
-    """
-    for table_data in tables_data:
-        logging.info(f"Writing data to table: {table_data.table.__tablename__}")
-
-        # Clear data in DB
-        session.exec(delete(table_data.table))
-
-        # Select columns from dataframe that match table columns, except "id" column
-        table_columns = table_data.table.__table__.columns.keys()
-        table_columns.remove("id")
-
-        # Remove columns that aren't in the dataframe
-        table_columns = [col for col in table_columns if col in table_data.df.columns]
-
-        # Write data from dataframe
-        df = table_data.df[table_columns]
-        df.to_sql(
-            name=table_data.table.__tablename__,
-            con=session.connection(),
-            if_exists="append",
-            index=False,
-        )
-
-
-# -------------------------------------------------------
-# Utilities
-# -------------------------------------------------------
-def mask_pw(odbc_str):
-    """
-    Mask uid and pwd in ODBC connection string for logging
-    """
-    # Use regex to mask uid= and pwd= values
-    masked_str = re.sub(r"(uid=|pwd=)[^;]*", r"\1****", odbc_str, flags=re.IGNORECASE)
-    return masked_str
-
-
-def get_excel_files(dir_path):
-    return [
-        os.path.join(dir_path, f) for f in os.listdir(dir_path) if f.endswith(".xlsx")
-    ]
-
-
 # -------------------------------------------------------
 # Main entry point
 # -------------------------------------------------------
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Ingest raw data into PRH warehouse.")
+    parser = argparse.ArgumentParser(
+        description="Ingest source data into PRH warehouse."
+    )
     parser.add_argument(
         "-i",
         "--input_dir",
@@ -305,33 +194,36 @@ def parse_arguments():
     )
     parser.add_argument(
         "-o",
-        "--output",
+        "--out",
         help='Output DB connection string, including credentials if needed. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
         default=PRW_DB_ODBC,
     )
     parser.add_argument(
-        "--idoutput",
+        "--id_out",
         help="Output connection string for ID DB, or 'None' to skip",
         default=PRW_ID_DB_ODBC,
+    )
+    parser.add_argument(
+        "--drop",
+        action="store_true",
+        help="Drop and recreate all tables before ingesting data",
     )
     return parser.parse_args()
 
 
 def main():
-    # Logging configuration
-    logging.basicConfig(level=logging.INFO)
-
     # Load config from cmd line
     args = parse_arguments()
     dir_path = args.input_dir
-    output_odbc = args.output
-    id_output_odbc = args.idoutput if args.idoutput.lower() != "none" else None
+    output_odbc = args.out
+    id_output_odbc = args.id_out if args.id_out.lower() != "none" else None
+    drop_tables = args.drop
     logging.info(
-        f"Data dir: {dir_path}, output: {mask_pw(output_odbc)}, id output: {mask_pw(id_output_odbc or 'None')}"
+        f"Data dir: {dir_path}, output: {util.mask_pw(output_odbc)}, id output: {util.mask_pw(id_output_odbc or 'None')}"
     )
 
     # Source file paths
-    encounters_files = get_excel_files(dir_path)
+    encounters_files = util.get_excel_files(dir_path)
     logging.info(f"Source files: {encounters_files}")
 
     # Sanity check data directory expected location and files
@@ -342,7 +234,7 @@ def main():
     # If ID DB is specified, read existing ID mappings
     prw_id_engine, mrn_to_prw_id_df = None, None
     if id_output_odbc:
-        prw_id_engine = get_db_connection(id_output_odbc)
+        prw_id_engine = db_utils.get_db_connection(id_output_odbc, echo=SHOW_SQL_IN_LOG)
         if prw_id_engine is None:
             logging.error("ERROR: cannot open ID DB (see above). Terminating.")
             exit(1)
@@ -356,13 +248,18 @@ def main():
     patients_df, encounters_df = read_encounters(encounters_files, mrn_to_prw_id_df)
 
     # Get connection to output DBs
-    prw_engine = get_db_connection(output_odbc)
+    prw_engine = db_utils.get_db_connection(output_odbc, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
         logging.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
     prw_session = Session(prw_engine)
 
     # Create tables if they do not exist
+    if drop_tables:
+        logging.info("Dropping existing tables")
+        prw_model.PrwMetaModel.metadata.drop_all(prw_engine)
+        prw_model.PrwModel.metadata.drop_all(prw_engine)
+    logging.info("Creating tables")
     prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
@@ -370,7 +267,7 @@ def main():
     clear_tables(prw_session, [prw_model.PrwEncounter, prw_model.PrwPatient])
 
     # Write into DB
-    write_tables_to_db(
+    clear_tables_and_insert_data(
         prw_session,
         [
             TableData(table=prw_model.PrwPatient, df=patients_df),
@@ -383,7 +280,7 @@ def main():
         file: datetime.fromtimestamp(os.path.getmtime(file))
         for file in encounters_files
     }
-    write_meta(prw_session, modified)
+    prw_meta.write_meta(prw_session, INGEST_DATASET_ID, modified)
 
     # Cleanup
     prw_session.commit()
@@ -394,7 +291,7 @@ def main():
     if prw_id_engine:
         prw_id_session = Session(prw_id_engine)
         prw_id_model.PrwIdModel.metadata.create_all(prw_id_engine)
-        write_tables_to_db(
+        clear_tables_and_insert_data(
             prw_id_session, [TableData(table=prw_id_model.PrwId, df=patients_df)]
         )
         prw_id_session.commit()

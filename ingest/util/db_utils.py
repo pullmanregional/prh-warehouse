@@ -19,6 +19,9 @@ class TableData:
 # DB Utilities
 # -------------------------------------------------------
 def get_db_connection(odbc_str: str, echo: bool = False) -> sqlalchemy.Engine:
+    """
+    Given an ODBC connection string, return a connection to the DB via SQLModel
+    """
     # Split connection string into odbc prefix and parameters (ie everything after odbc_connect=)
     match = re.search(r"^(.*odbc_connect=)(.*)$", odbc_str)
     prefix = match.group(1) if match else ""
@@ -51,7 +54,7 @@ def clear_tables(session: Session, tables: List[SQLModel]):
 
 def clear_tables_and_insert_data(session: Session, tables_data: List[TableData]):
     """
-    Write data from dataframes to DB tables
+    Write data from dataframes to DB tables, clearing and overwriting existing tables
     """
     for table_data in tables_data:
         logging.info(f"Writing data to table: {table_data.table.__tablename__}")

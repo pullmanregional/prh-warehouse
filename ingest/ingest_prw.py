@@ -162,19 +162,54 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
             else None
         )
     )
-    patients_df.drop(columns=["dob"], inplace=True)
 
     # -------------------------------------------------------
     # Transform encounters data
     # -------------------------------------------------------
     # Replace MRN with prw_id
     encounters_df = encounters_df.merge(mrn_to_prw_id_df, on="mrn", how="left")
-    encounters_df.drop(columns=["mrn"], inplace=True)
 
     # Force encounter_date to be date only, no time
     encounters_df["encounter_date"] = pd.to_datetime(
         encounters_df["encounter_date"]
     ).dt.date
+
+    # Calculate encounter age and encounter_age_mo based on encounter_date and dob
+    encounters_df = encounters_df.merge(
+        patients_df[["prw_id", "dob"]], 
+        on="prw_id", 
+        how="left"
+    )
+    encounters_df["encounter_age"] = encounters_df.apply(
+        lambda row: relativedelta(
+            pd.Timestamp(row["encounter_date"]),
+            row["dob"]
+        ).years,
+        axis=1
+    )
+    encounters_df["encounter_age_mo"] = encounters_df.apply(
+        lambda row: (
+            relativedelta(
+                pd.Timestamp(row["encounter_date"]),
+                row["dob"]
+            ).years * 12 + 
+            relativedelta(
+                pd.Timestamp(row["encounter_date"]),
+                row["dob"]
+            ).months
+            if relativedelta(
+                pd.Timestamp(row["encounter_date"]),
+                row["dob"]
+            ).years < 2
+            else None
+        ),
+        axis=1
+    )
+    encounters_df.drop(columns=["dob"], inplace=True)
+
+    # Drop PHI columns
+    patients_df.drop(columns=["dob"], inplace=True)
+    encounters_df.drop(columns=["mrn"], inplace=True)
 
     return patients_df, encounters_df
 

@@ -12,7 +12,7 @@ from util import prw_id, db_utils, util, prw_meta
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
 
 # Unique identifier for this ingest dataset
-INGEST_DATASET_ID = "encounters"
+DATASET_ID = "encounters"
 
 # -------------------------------------------------------
 # Config
@@ -299,7 +299,7 @@ def main():
         file: datetime.fromtimestamp(os.path.getmtime(file))
         for file in encounters_files
     }
-    prw_meta.write_meta(prw_session, INGEST_DATASET_ID, modified)
+    prw_meta.write_meta(prw_session, DATASET_ID, modified)
 
     # Cleanup
     prw_session.commit()

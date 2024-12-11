@@ -38,7 +38,7 @@ async def pipenv_install():
     Creates virtual environment for all subflows defined in ../ingest/. The virtual environment is named
     using PIPENV_CUSTOM_VENV_NAME in the ./.env so it is reused between runs.
     """
-    return await ingest_shell_op(["pipenv install"])
+    return await ingest_shell_op(["PIPENV_IGNORE_VIRTUALENVS=1 pipenv install"])
 
 
 # -----------------------------------------
@@ -66,15 +66,17 @@ async def ingest_source_finance():
 # Additional transforms to source data
 # -----------------------------------------
 @flow
-async def ingest_transform_patient_panel():
-    return await ingest_shell_op(["pipenv run python transform_patient_panel.py"])
+async def transform_patient_panel():
+    return await ingest_shell_op(
+        [f'pipenv run python transform_patient_panel.py -db "{PRW_DB_ODBC}"'],
+    )
 
 
 # -----------------------------------------
 # Create datamarts
 # -----------------------------------------
 @flow
-async def ingest_datamart_finance():
+async def create_datamart_finance():
     return await ingest_shell_op(["pipenv run python ingest_finance.py"])
 
 
@@ -90,13 +92,13 @@ async def prh_prw_ingest():
     ingest_flows = [ingest_source_encounters(), ingest_source_finance()]
     await asyncio.gather(*ingest_flows)
 
-    # After ingest flows are complete, run transform flows, which add calculate
+    # After ingest flows are complete, run transform flows, which calculate
     # additional common columns that will be used across multiple applications
-    transform_flows = [ingest_transform_patient_panel()]
+    transform_flows = [transform_patient_panel()]
     await asyncio.gather(*transform_flows)
 
     # Lastly create datamarts for each application
-    datamart_flows = [ingest_datamart_finance()]
+    datamart_flows = [create_datamart_finance()]
     await asyncio.gather(*datamart_flows)
 
 

@@ -1,5 +1,6 @@
 import re
 import os
+import logging
 
 
 # -------------------------------------------------------
@@ -41,3 +42,8 @@ def find_data_files(path, exclude=None):
                     ret.append(filepath)
 
     return sorted(ret)
+
+
+def error_exit(msg):
+    logging.error(msg)
+    exit(1)

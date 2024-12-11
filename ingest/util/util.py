@@ -21,7 +21,7 @@ def get_excel_files(dir_path):
     return [
         os.path.join(dir_path, f)
         for f in os.listdir(dir_path)
-        if f.endswith(".xlsx") and not f.startswith("~")
+        if f.endswith(".xlsx") and not f.startswith(".") and not f.startswith("~")
     ]
 
 

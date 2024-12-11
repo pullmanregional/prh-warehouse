@@ -52,7 +52,9 @@ def clear_tables(session: Session, tables: List[SQLModel]):
         session.exec(delete(table))
 
 
-def clear_tables_and_insert_data(session: Session, tables_data: List[TableData]):
+def clear_tables_and_insert_data(
+    session: Session, tables_data: List[TableData], chunk_size: int = 25000
+):
     """
     Write data from dataframes to DB tables, clearing and overwriting existing tables
     """
@@ -76,4 +78,5 @@ def clear_tables_and_insert_data(session: Session, tables_data: List[TableData])
             con=session.connection(),
             if_exists="append",
             index=False,
+            chunksize=chunk_size,
         )

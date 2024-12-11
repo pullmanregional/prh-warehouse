@@ -5,6 +5,8 @@ __pycache__
 ingest/data/*
 ingest/*.sqlite3
 *.xlsx
+*.tsv
+*.csv
 
 # Azure Data Studio build files
 ads/bin

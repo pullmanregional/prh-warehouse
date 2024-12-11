@@ -8,7 +8,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from sqlmodel import Session, select, inspect
 from prw_model import prw_model, prw_id_model
-from util import prw_id, db_utils, util, prw_meta
+from util import prw_id_utils, db_utils, util, prw_meta_utils
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
 
 # Unique identifier for this ingest dataset
@@ -108,10 +108,15 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     patients_df = df[
         [
             "mrn",
+            "name",
             "sex",
             "dob",
+            "address",
             "city",
             "state",
+            "zip",
+            "phone",
+            "email",
             "pcp",
         ]
     ].copy()
@@ -132,13 +137,25 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     ].copy()
 
     # -------------------------------------------------------
-    # Transform patient data
+    # Fix data types
+    # -------------------------------------------------------
+    # Convert MRN to string
+    patients_df["mrn"] = patients_df["mrn"].astype(str)
+    encounters_df["mrn"] = encounters_df["mrn"].astype(str)
+
+    # Force encounter_date to be date only, no time
+    encounters_df["encounter_date"] = pd.to_datetime(
+        encounters_df["encounter_date"]
+    ).dt.date
+
+    # -------------------------------------------------------
+    # Add prw_id to patients and encounters
     # -------------------------------------------------------
     # Drop duplicate patients based on 'mrn' and keep the first occurrence
     patients_df = patients_df.drop_duplicates(subset=["mrn"], keep="first").copy()
 
     # Calculate prw_id from MRN, and store translation table
-    patients_df = prw_id.calc_prw_id(
+    patients_df = prw_id_utils.calc_prw_id(
         patients_df,
         src_id_col="mrn",
         id_col="prw_id",
@@ -146,56 +163,91 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     )
     mrn_to_prw_id_df = patients_df[["mrn", "prw_id"]].copy()
 
-    # Calculate age and age_mo from dob
+    # Convert encounter MRN to prw_id
+    encounters_df = encounters_df.merge(mrn_to_prw_id_df, on="mrn", how="left")
+    encounters_df.drop(columns=["mrn"], inplace=True)
+
+    return patients_df, encounters_df
+
+
+# -------------------------------------------------------
+# Transform
+# -------------------------------------------------------
+def calc_patient_age(patients_df: pd.DataFrame):
+    """
+    Calculate age and age_in_mo_under_3 from dob
+    """
+    # Calculate age and age in months (if <3yo) from dob
+    logging.info("Calculating patient ages")
     now = pd.Timestamp.now()
     patients_df["age"] = patients_df["dob"].apply(
         lambda dob: relativedelta(now, dob).years
     )
-    patients_df["age_mo"] = patients_df["dob"].apply(
+    patients_df["age_in_mo_under_3"] = patients_df["dob"].apply(
         lambda dob: (
             relativedelta(now, dob).years * 12 + relativedelta(now, dob).months
-            if relativedelta(now, dob).years < 2
+            if relativedelta(now, dob).years <= 2
             else None
         )
     )
+    return patients_df
 
-    # -------------------------------------------------------
-    # Transform encounters data
-    # -------------------------------------------------------
-    # Replace MRN with prw_id
-    encounters_df = encounters_df.merge(mrn_to_prw_id_df, on="mrn", how="left")
 
-    # Force encounter_date to be date only, no time
-    encounters_df["encounter_date"] = pd.to_datetime(
-        encounters_df["encounter_date"]
-    ).dt.date
-
-    # Calculate encounter age and encounter_age_mo based on encounter_date and dob
+def calc_age_at_encounter(encounters_df: pd.DataFrame, patients_df: pd.DataFrame):
+    """
+    Calculate encounter age and encounter_age_in_mo_under_3 based on encounter_date and patient's DOB
+    """
+    logging.info("Calculating patient ages at encounter")
+    # Get each patient's DOB
     encounters_df = encounters_df.merge(
         patients_df[["prw_id", "dob"]], on="prw_id", how="left"
     )
+
+    # Calculate age of patient at encounter in years and months (if under 3) encounter_date and dob
     encounters_df["encounter_age"] = encounters_df.apply(
         lambda row: relativedelta(
             pd.Timestamp(row["encounter_date"]), row["dob"]
         ).years,
         axis=1,
     )
-    encounters_df["encounter_age_mo"] = encounters_df.apply(
+    encounters_df["encounter_age_in_mo_under_3"] = encounters_df.apply(
         lambda row: (
             relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).years * 12
             + relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).months
-            if relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).years < 2
+            if relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).years <= 2
             else None
         ),
         axis=1,
     )
     encounters_df.drop(columns=["dob"], inplace=True)
 
-    # Drop PHI columns
-    patients_df.drop(columns=["dob"], inplace=True)
-    encounters_df.drop(columns=["mrn"], inplace=True)
+    return encounters_df
 
-    return patients_df, encounters_df
+
+def partition_phi(patients_df: pd.DataFrame):
+    """
+    Partition patients_df into PHI, which will be stored in ID DB, and non-PHI, which will be stored in the main DB
+    """
+    logging.info("Partitioning PHI")
+    id_details_df = patients_df[
+        [
+            "prw_id",
+            "mrn",
+            "name",
+            "dob",
+            "address",
+            "city",
+            "state",
+            "zip",
+            "phone",
+            "email",
+        ]
+    ]
+    patients_df = patients_df[
+        ["prw_id", "sex", "age", "age_in_mo_under_3", "city", "state", "pcp"]
+    ]
+
+    return patients_df, id_details_df
 
 
 # -------------------------------------------------------
@@ -266,6 +318,12 @@ def main():
     # Read source files into memory
     patients_df, encounters_df = read_encounters(encounters_files, mrn_to_prw_id_df)
 
+    # Transform data only to partition PHI into separate DB. All other data
+    # transformations should be done by later flows in the pipeline.
+    patients_df = calc_patient_age(patients_df)
+    encounters_df = calc_age_at_encounter(encounters_df, patients_df)
+    patients_df, id_details_df = partition_phi(patients_df)
+
     # Get connection to output DBs
     prw_engine = db_utils.get_db_connection(output_odbc, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
@@ -299,7 +357,7 @@ def main():
         file: datetime.fromtimestamp(os.path.getmtime(file))
         for file in encounters_files
     }
-    prw_meta.write_meta(prw_session, DATASET_ID, modified)
+    prw_meta_utils.write_meta(prw_session, DATASET_ID, modified)
 
     # Cleanup
     prw_session.commit()
@@ -308,10 +366,17 @@ def main():
 
     # Write ID data to separate DB if provided
     if prw_id_engine:
+        logging.info("Writing ID data")
+        id_df = id_details_df[["prw_id", "mrn"]]
         prw_id_session = Session(prw_id_engine)
         prw_id_model.PrwIdModel.metadata.create_all(prw_id_engine)
+        prw_id_model.PrwIdDetails.metadata.create_all(prw_id_engine)
         clear_tables_and_insert_data(
-            prw_id_session, [TableData(table=prw_id_model.PrwId, df=patients_df)]
+            prw_id_session,
+            [
+                TableData(table=prw_id_model.PrwId, df=id_df),
+                TableData(table=prw_id_model.PrwIdDetails, df=id_details_df),
+            ],
         )
         prw_id_session.commit()
         prw_id_session.close()

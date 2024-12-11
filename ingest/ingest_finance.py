@@ -102,6 +102,7 @@ def main():
     drop_tables = args.drop
 
     logging.info(f"Data dir: {base_path}, output: {util.mask_pw(output_odbc)}")
+    logging.info(f"Drop tables before writing: {drop_tables}")
 
     # Source file paths
     volumes_file, income_stmt_path, hours_path, historical_hours_file = get_file_paths(

@@ -292,6 +292,7 @@ def main():
     logging.info(
         f"Data dir: {dir_path}, output: {util.mask_pw(output_odbc)}, id output: {util.mask_pw(id_output_odbc or 'None')}"
     )
+    logging.info(f"Drop tables before writing: {drop_tables}")
 
     # Source file paths
     encounters_files = util.get_excel_files(dir_path)

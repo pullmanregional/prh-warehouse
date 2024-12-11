@@ -1,3 +1,10 @@
+# This Pipfile defines dependencies for scripts under prefect/. However, these scripts are run
+# under the user's environment, not a virtual environment.
+#
+# Install dependencies into the user's global system python with:
+#
+#   pipenv install --system -v
+#
 [[source]]
 url = "https://pypi.org/simple"
 verify_ssl = true

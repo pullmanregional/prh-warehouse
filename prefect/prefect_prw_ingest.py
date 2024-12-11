@@ -1,6 +1,7 @@
 import os
 import pathlib
 import asyncio
+import argparse
 from dotenv import load_dotenv
 from prefect import flow, task
 from prefect_shell import ShellOperation
@@ -20,6 +21,9 @@ load_dotenv()
 PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
 PRW_DB_ODBC = os.environ.get("PRW_DB_ODBC", Secret.load("prw-db-url").get())
+
+# Subflows should drop tables before ingesting data
+DROP_FLAG = ""
 
 
 # -----------------------------------------
@@ -48,7 +52,7 @@ async def pipenv_install():
 async def ingest_source_encounters():
     return await ingest_shell_op(
         [
-            f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_DB_ODBC}"'
+            f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {DROP_FLAG}',
         ],
     )
 
@@ -57,7 +61,7 @@ async def ingest_source_encounters():
 async def ingest_source_finance():
     return await ingest_shell_op(
         [
-            f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}"'
+            f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {DROP_FLAG}',
         ],
     )
 
@@ -103,4 +107,15 @@ async def prh_prw_ingest():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Main Ingest Prefect Flow for PRH warehouse."
+    )
+    parser.add_argument(
+        "--drop",
+        action="store_true",
+        help="Drop and recreate tables before ingesting data",
+    )
+    args = parser.parse_args()
+    DROP_FLAG = "--drop" if args.drop else ""
+
     asyncio.run(prh_prw_ingest())

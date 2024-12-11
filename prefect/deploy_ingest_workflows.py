@@ -1,9 +1,6 @@
-import os
-from pathlib import Path
 from prefect import flow, deploy
 from prefect.runner.storage import GitRepository
 from prefect_github import GitHubCredentials
-from dotenv import load_dotenv
 
 # cron syntax reference:
 # * * * * *
@@ -12,9 +9,6 @@ from dotenv import load_dotenv
 # | | +--------- day of month (1 - 31)
 # | +----------- hour (0 - 23)
 # +------------- minute (0 - 59)
-
-# Load environment from .env file, does not overwrite existing env variables
-load_dotenv()
 
 if __name__ == "__main__":
     flows = []

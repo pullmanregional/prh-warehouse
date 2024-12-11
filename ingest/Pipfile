@@ -7,13 +7,10 @@ name = "pypi"
 sqlmodel = "*"
 openpyxl = "*"
 cryptography = "*"
-python-dotenv = "*"
 pandas = "*"
 pyodbc = "*"
-prefect = {extras = ["shell"], version = "*"}
-
-[dev-packages]
-black = "*"
 
 [requires]
 python_version = "3"
+
+[dev-packages]

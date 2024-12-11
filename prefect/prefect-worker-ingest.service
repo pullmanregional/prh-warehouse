@@ -12,10 +12,10 @@
 Description=Prefect Worker for ingest pool
 
 [Service]
-User=jlee
-WorkingDirectory=/home/jlee/prh-warehouse
-EnvironmentFile=/home/jlee/prh-warehouse/prefect/.env
-ExecStart=/home/jlee/.pyenv/shims/prefect worker start --pool "ingest"
+User=prefect
+WorkingDirectory=/home/prefect/prh-warehouse
+EnvironmentFile=/home/prefect/prh-warehouse/prefect/.env
+ExecStart=/home/prefect/.pyenv/shims/prefect worker start --pool "ingest"
 Restart=always
 
 [Install]

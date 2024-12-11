@@ -7,7 +7,6 @@ from typing import List
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from sqlmodel import Session, select, inspect
-from dotenv import load_dotenv
 from prw_model import prw_model, prw_id_model
 from util import prw_id, db_utils, util, prw_meta
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
@@ -18,12 +17,9 @@ INGEST_DATASET_ID = "encounters"
 # -------------------------------------------------------
 # Config
 # -------------------------------------------------------
-# Load environment from .env file, does not overwrite existing env variables
-load_dotenv()
-
-# Load security sensitive config from env vars. Default output to local SQLite DB.
-PRW_DB_ODBC = os.environ.get("PRW_DB_ODBC", "sqlite:///prw.sqlite3")
-PRW_ID_DB_ODBC = os.environ.get("PRW_ID_DB_ODBC", "sqlite:///prw_id.sqlite3")
+# Default output to local SQLite DB.
+DEFAULT_PRW_DB_ODBC = "sqlite:///prw.sqlite3"
+DEFAULT_PRW_ID_DB_ODBC = "sqlite:///prw_id.sqlite3"
 
 # Input files
 DEFAULT_DATA_DIR = "./data/encounters"
@@ -176,34 +172,22 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
 
     # Calculate encounter age and encounter_age_mo based on encounter_date and dob
     encounters_df = encounters_df.merge(
-        patients_df[["prw_id", "dob"]], 
-        on="prw_id", 
-        how="left"
+        patients_df[["prw_id", "dob"]], on="prw_id", how="left"
     )
     encounters_df["encounter_age"] = encounters_df.apply(
         lambda row: relativedelta(
-            pd.Timestamp(row["encounter_date"]),
-            row["dob"]
+            pd.Timestamp(row["encounter_date"]), row["dob"]
         ).years,
-        axis=1
+        axis=1,
     )
     encounters_df["encounter_age_mo"] = encounters_df.apply(
         lambda row: (
-            relativedelta(
-                pd.Timestamp(row["encounter_date"]),
-                row["dob"]
-            ).years * 12 + 
-            relativedelta(
-                pd.Timestamp(row["encounter_date"]),
-                row["dob"]
-            ).months
-            if relativedelta(
-                pd.Timestamp(row["encounter_date"]),
-                row["dob"]
-            ).years < 2
+            relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).years * 12
+            + relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).months
+            if relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).years < 2
             else None
         ),
-        axis=1
+        axis=1,
     )
     encounters_df.drop(columns=["dob"], inplace=True)
 
@@ -231,12 +215,12 @@ def parse_arguments():
         "-o",
         "--out",
         help='Output DB connection string, including credentials if needed. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=PRW_DB_ODBC,
+        default=DEFAULT_PRW_DB_ODBC,
     )
     parser.add_argument(
         "--id_out",
         help="Output connection string for ID DB, or 'None' to skip",
-        default=PRW_ID_DB_ODBC,
+        default=DEFAULT_PRW_ID_DB_ODBC,
     )
     parser.add_argument(
         "--drop",

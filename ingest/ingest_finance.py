@@ -19,8 +19,8 @@ INGEST_DATASET_ID = "finance"
 # Load environment from .env file, does not overwrite existing env variables
 load_dotenv()
 
-# Load security sensitive config from env vars. Default output to local SQLite DB.
-PRW_DB_ODBC = os.environ.get("PRW_DB_ODBC", "sqlite:///prw.sqlite3")
+# Default output to local SQLite DB.
+DEFAULT_PRW_DB_ODBC = "sqlite:///prw.sqlite3"
 
 # Input files
 DEFAULT_DATA_DIR = "./data/finance"
@@ -84,7 +84,7 @@ def parse_arguments():
         "-o",
         "--out",
         help='Output DB connection string, including credentials if needed. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=PRW_DB_ODBC,
+        default=DEFAULT_PRW_DB_ODBC,
     )
     parser.add_argument(
         "--drop",

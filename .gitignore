@@ -8,3 +8,6 @@ ingest/*.sqlite3
 # Azure Data Studio build files
 ads/bin
 ads/obj
+
+# OS
+.DS_Store

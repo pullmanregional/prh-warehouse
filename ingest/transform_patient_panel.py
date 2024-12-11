@@ -4,7 +4,7 @@ import argparse
 import pandas as pd
 from dataclasses import dataclass
 from sqlmodel import Session
-from util import util, db_utils, prw_meta
+from util import util, db_utils, prw_meta_utils
 from prw_model.prw_panel_model import *
 
 # -------------------------------------------------------
@@ -93,21 +93,24 @@ WELL_ENCOUNTER_TYPES = [
 ]
 
 
-def transform_to_panels(src: SrcData) -> OutData:
+def transform_add_other_panels(src: SrcData):
     """
-    Transform source data into panel data
+    Add panel data (panel_location, panel_provider) to patients_df in place
+
+    Use encounter data from src.encounters_df, data model defined in prw_model.prw_model.PrwEncounter,
+    to calculate the paneled provider. Implement the 4 cut method from CCI:
+    1st Cut Patients who have seen only one provider in the past year - Assigned to that provider
+    2nd Cut Patients who have seen multiple providers, but one provider the majority of the time
+            in the past year - Assigned to the majority provider
+    3rd Cut Patients who have seen two or more providers equally in the past year (No majority
+            provider can be determined) - Assigned to the provider who performed the last well exam
+    4th Cut Patients who have seen multiple providers - Assigned to the last provider seen
     """
     logging.info("Transforming data")
     patients_df, encounters_df = src.patients_df, src.encounters_df
 
-    # Use encounter data from src.encounters_df, data model defined in prw_model.prw_model.PrwEncounter,
-    # to calculate the paneled provider. Implement the 4 cut method from CCI:
-    # 1st Cut Patients who have seen only one provider in the past year - Assigned to that provider
-    # 2nd Cut Patients who have seen multiple providers, but one provider the majority of the time
-    #         in the past year - Assigned to the majority provider
-    # 3rd Cut Patients who have seen two or more providers equally in the past year (No majority
-    #         provider can be determined) - Assigned to the provider who performed the last well exam
-    # 4th Cut Patients who have seen multiple providers - Assigned to the last provider seen
+    # Initialize panel columns
+    logging.info(f"Number of patients: {len(patients_df)}")
 
     # Filter to encounters in the past year
     one_year_ago = pd.Timestamp.now() - pd.DateOffset(years=1)
@@ -119,12 +122,6 @@ def transform_to_panels(src: SrcData) -> OutData:
     recent_encounters = recent_encounters[
         recent_encounters["service_provider"].isin(PROVIDER_TO_LOCATION.keys())
     ]
-
-    # Initialize panel assignments
-    patients_panels_df = patients_df[["prw_id"]].copy()
-    patients_panels_df["panel_provider"] = None
-    patients_panels_df["panel_location"] = None
-    logging.info(f"Number of patients: {len(patients_panels_df)}")
 
     # Get counts of providers per patient
     provider_counts = (
@@ -209,31 +206,38 @@ def transform_to_panels(src: SrcData) -> OutData:
         ]
     )
     logging.info(
-        f"Total assignments: {len(all_assignments)} {len(all_assignments)/len(patients_panels_df)*100:.2f}%"
+        f"Total assignments: {len(all_assignments)} {len(all_assignments)/len(patients_df)*100:.2f}%"
     )
 
-    # Update panel assignments
-    patients_panels_df = patients_panels_df.merge(
-        all_assignments, on="prw_id", how="left"
+    # Merge all_assignments back into patients_df
+    all_assignments = patients_df.merge(
+        all_assignments, on="prw_id", how="left", suffixes=("", "_new")
     )
+    patients_df["panel_provider"] = all_assignments["service_provider"]
 
     # Map providers to locations
-    patients_panels_df["panel_location"] = patients_panels_df["service_provider"].map(
+    patients_df["panel_location"] = patients_df["panel_provider"].map(
         PROVIDER_TO_LOCATION
     )
-    patients_panels_df["panel_provider"] = patients_panels_df["service_provider"]
 
-    # Keep only panel columns
-    patients_panels_df = patients_panels_df[
-        ["prw_id", "panel_location", "panel_provider"]
-    ]
     print(
         "\nData Sample:\n-----------------------------------------------------------------------------------\n",
-        patients_panels_df.head(),
+        patients_df[["prw_id", "panel_location", "panel_provider"]].head(),
         "\n-----------------------------------------------------------------------------------\n",
     )
 
-    return OutData(patients_panels_df=patients_panels_df)
+    return patients_df
+
+
+def keep_panel_data(src: SrcData) -> OutData:
+    """
+    Keep only panel data
+    """
+    return OutData(
+        patients_panels_df=src.patients_df[
+            ["prw_id", "panel_location", "panel_provider"]
+        ]
+    )
 
 
 # -------------------------------------------------------
@@ -270,7 +274,9 @@ def main():
         util.error_exit("ERROR: failed to read source data (see above)")
 
     # Transform data
-    out = transform_to_panels(src)
+    # transform_add_peds_panels(src)
+    transform_add_other_panels(src)
+    out = keep_panel_data(src)
 
     # Create tables if they do not exist
     logging.info("Creating tables")
@@ -286,7 +292,7 @@ def main():
     )
 
     # Update last ingest time and modified times for source data files
-    prw_meta.write_meta(prw_session, DATASET_ID)
+    prw_meta_utils.write_meta(prw_session, DATASET_ID)
 
     # Cleanup
     prw_session.commit()

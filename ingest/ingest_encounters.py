@@ -173,6 +173,16 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
 # -------------------------------------------------------
 # Transform
 # -------------------------------------------------------
+ME_PROVIDER = "Jonathan Lee, MD"
+
+
+def map_me_provider(patients_df: pd.DataFrame):
+    patients_df["pcp"] = patients_df["pcp"].apply(
+        lambda provider: ME_PROVIDER if provider == "Me" else provider
+    )
+    return patients_df
+
+
 def calc_patient_age(patients_df: pd.DataFrame):
     """
     Calculate age and age_in_mo_under_3 from dob
@@ -318,6 +328,7 @@ def main():
 
     # Read source files into memory
     patients_df, encounters_df = read_encounters(encounters_files, mrn_to_prw_id_df)
+    patients_df = map_me_provider(patients_df)
 
     # Transform data only to partition PHI into separate DB. All other data
     # transformations should be done by later flows in the pipeline.

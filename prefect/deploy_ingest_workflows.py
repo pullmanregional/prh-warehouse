@@ -42,14 +42,14 @@ if __name__ == "__main__":
         )
     )
 
-    # Financial dashboard data
+    # Main warehouse ingest
     prh_warehouse_repo = GitRepository(
         url="https://github.com/pullmanregional/prh-warehouse.git"
     )
     flows.append(
         flow.from_source(
             source=prh_warehouse_repo,
-            entrypoint="prefect/prh_prw_ingest.py:prh_prw_ingest",
+            entrypoint="prefect/prefect_prw_ingest.py:prw_ingest",
         ).to_deployment(
             "prh-prw-ingest",
             cron="0 9 * * *",  # Daily at 09:00 AM

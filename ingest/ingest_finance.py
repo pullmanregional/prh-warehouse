@@ -6,7 +6,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from sqlmodel import Session
 from finance import sanity, parse, transform
-from util import util, db_utils, prw_meta
+from util import util, db_utils, prw_meta_utils
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
 from prw_model.prw_finance_model import *
 
@@ -190,7 +190,7 @@ def main():
     modified = {
         file: datetime.fromtimestamp(os.path.getmtime(file)) for file in source_files
     }
-    prw_meta.write_meta(prw_session, INGEST_DATASET_ID, modified)
+    prw_meta_utils.write_meta(prw_session, INGEST_DATASET_ID, modified)
 
     # Cleanup
     prw_session.commit()

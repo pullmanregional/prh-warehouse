@@ -5,6 +5,7 @@
 #
 #   pipenv install --system -v
 #
+
 [[source]]
 url = "https://pypi.org/simple"
 verify_ssl = true
@@ -15,9 +16,6 @@ python_version = "3"
 
 [packages]
 python-dotenv = "*"
-prefect-aws = "*"
-prefect-github = "*"
-prefect-shell = "*"
-prefect = "*"
+prefect = {extras = ["aws", "shell", "github"], version = "*"}
 
 [dev-packages]

@@ -52,45 +52,232 @@ def read_source_tables(session: Session) -> SrcData:
 # Transform
 # -------------------------------------------------------
 PROVIDER_TO_LOCATION = {
-    "Sangha, Dildeep [6229238]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Olawuyi, Damola Bolutife [7191596]": "CC WPL FM RESIDENCY CLINIC",
-    "Davis, Jennifer [54070483]": "CC WPL PALOUSE HEALTH CENTER",
-    "Boyd, Jeana M [6628044]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "White, Malia [80012005]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Hatley, Shannon M [6134031]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Adkins, Benjamin J [50032100]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Guida, Kimberley [50032826]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Ward, Jeffrey Loren [5746915]": "CC WPL FM RESIDENCY CLINIC",
-    "Harris, Brenna R [54981938]": "CC WPL FM RESIDENCY CLINIC",
-    "Brodsky, Kaz B [55037680]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Smith, Angeline Elizabeth [5656055]": "CC WPL PALOUSE HEALTH CENTER",
-    "Cargill, Teresa [55064229]": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Thompson, Molly [55040931]": "CC WPL FM RESIDENCY CLINIC",
-    "Perin, Karly [7950541]": "CC WPL FM RESIDENCY CLINIC",
-    "Younes, Mohammed [5772847]": "CC WPL FM RESIDENCY CLINIC",
-    "Mader, Kelsey [S6148634]": "CC WPL FM RESIDENCY CLINIC",
-    "Shakir, Tuarum N [6411322]": "CC WPL FM RESIDENCY CLINIC",
-    "Frostad, Michael [50032808]": "CC WPL PALOUSE PEDIATRICS MOSCOW",
-    "Hryniewicz, Kathryn [54977206]": "CC WPL PALOUSE PEDIATRICS MOSCOW",
-    "Rinaldi, Mackenzie Claire [N9170397]": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Shields, Maricarmen [55020855]": "CC WPL PALOUSE PEDIATRICS MOSCOW",
-    "Lee, Jonathan [X9162396]": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Gordon, Methuel [54062579]": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Manderville, Tracy [8570166]": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Clinic, Pullman Fam Med Residency [75007538]": "CC WPL FM RESIDENCY CLINIC",
+    "Sangha, Dildeep": "CC WPL PULLMAN FAMILY MEDICINE",
+    "Olawuyi, Damola Bolutife": "CC WPL FM RESIDENCY CLINIC",
+    "Davis, Jennifer": "CC WPL PALOUSE HEALTH CENTER",
+    "Boyd, Jeana M": "CC WPL PULLMAN FAMILY MEDICINE",
+    "White, Malia": "CC WPL PULLMAN FAMILY MEDICINE",
+    "Hatley, Shannon M": "CC WPL PULLMAN FAMILY MEDICINE",
+    "Adkins, Benjamin J": "CC WPL PULLMAN FAMILY MEDICINE",
+    "Guida, Kimberley": "CC WPL PULLMAN FAMILY MEDICINE",
+    "Ward, Jeffrey Loren": "CC WPL FM RESIDENCY CLINIC",
+    "Harris, Brenna R": "CC WPL FM RESIDENCY CLINIC",
+    "Brodsky, Kaz B": "CC WPL PULLMAN FAMILY MEDICINE",
+    "Smith, Angeline Elizabeth": "CC WPL PALOUSE HEALTH CENTER",
+    "Cargill, Teresa": "CC WPL PULLMAN FAMILY MEDICINE",
+    "Thompson, Molly": "CC WPL FM RESIDENCY CLINIC",
+    "Perin, Karly": "CC WPL FM RESIDENCY CLINIC",
+    "Younes, Mohammed": "CC WPL FM RESIDENCY CLINIC",
+    "Mader, Kelsey": "CC WPL FM RESIDENCY CLINIC",
+    "Shakir, Tuarum N": "CC WPL FM RESIDENCY CLINIC",
+    "Frostad, Michael": "CC WPL PALOUSE PEDIATRICS MOSCOW",
+    "Hryniewicz, Kathryn": "CC WPL PALOUSE PEDIATRICS MOSCOW",
+    "Rinaldi, Mackenzie Claire": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "Shields, Maricarmen": "CC WPL PALOUSE PEDIATRICS MOSCOW",
+    "Lee, Jonathan": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "Gordon, Methuel": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "Manderville, Tracy": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "Clinic, Pullman Fam Med Residency": "CC WPL FM RESIDENCY CLINIC",
 }
 WELL_ENCOUNTER_TYPES = [
-    "CC PHYSICAL [70000003]",
-    "CC SPORTS  [7600052]",
-    "CC WELL CH [71511022]",
-    "CC WELL CH [71511022]",
-    "CCWELLBABY [71311001]",
-    "MEDICARE WEL [3674]",
-    "NEWOB [70000012]",
-    "SUB AN WELL [945]",
-    "Well Women [71511038]",
-    "WELLNESS [3597]",
+    "CC PHYSICAL",
+    "CC SPORTS",
+    "CC WELL CH",
+    "CC WELL CH",
+    "CCWELLBABY",
+    "MEDICARE WEL",
+    "NEWOB",
+    "SUB AN WELL",
+    "Well Women",
+    "WELLNESS",
 ]
+WELL_ENCOUNTER_CODES = [
+    "V20.2",  # Health check > 28d, well adol
+    "V20.31",  # Newborn
+    "V20.32",  # Newborn
+    "V70.0",  # Prev health care
+    "1062090",  # Enc for well child, abnl
+    "1447670",  # Enc for well child at age
+    "1447671",  # Enc for well child at age
+    "1447672",  # Enc for well child at age
+    "1447673",  # Enc for well child at age
+    "1447674",  # Enc for well child at age
+    "1447675",  # Enc for well child at age
+    "1447676",  # Enc for well child at age
+    "1447677",  # Enc for well child at age
+    "1447678",  # Enc for well child at age
+    "1447679",  # Enc for well child at age
+    "1447680",  # Enc for well child at age
+    "1513399",  # Enc for well child, no abnl
+    "1513777",  # Enc for well child, no abnl
+    "1514624",  # Enc for well child, no abnl
+    "1514636",  # Enc for well child, no abnl
+    "1514654",  # Enc for well child, no abnl
+    "1564543",  # Enc for well child at age
+    "1564546",  # Enc for well child at age
+    "1564547",  # Enc for well child at age
+    "1564548",  # Enc for well child at age
+    "1564567",  # Enc for well child at age
+    "1666233",  # Enc for prev health
+    "1665397",  # Enc for well child at age
+    "1665398",  # Enc for well child at age
+    "1665399",  # Enc for well child at age
+    "1665402",  # Enc for well child at age
+    "1665403",  # Enc for well child at age
+    "1665404",  # Enc for well child at age
+    "1665405",  # Enc for well child at age
+    "1665406",  # Enc for well child at age
+    "1665407",  # Enc for well child at age
+    "1678386",  # Enc for well child at age
+    "1691453",  # Enc for well child at age
+    "1719267",  # Enc for well child at age
+    "1719268",  # Enc for well child at age
+    "1719269",  # Enc for well child at age
+]
+WELL_ENCOUNTER_CODES_REGEX = "|".join(f"[{code}]" for code in WELL_ENCOUNTER_CODES)
+
+
+def transform_add_peds_panels(src: SrcData):
+    """
+    Add panel data (panel_location, panel_provider) to patients_df in place
+    """
+    logging.info("Adding panel information for peds")
+    patients_df, encounters_df = src.patients_df, src.encounters_df
+
+    # Filter out patients that already have a panel provider or location
+    if "panel_provider" not in patients_df.columns:
+        patients_df["panel_provider"] = pd.NA
+    if "panel_location" not in patients_df.columns:
+        patients_df["panel_location"] = pd.NA
+    patients_df = patients_df[
+        (patients_df["panel_provider"].isna()) & (patients_df["panel_location"].isna())
+    ]
+
+    # Limit encounters to 3 years
+    three_years_ago = pd.Timestamp.now() - pd.DateOffset(years=3)
+    encounters_df = encounters_df[encounters_df["encounter_date"] >= three_years_ago]
+
+    # Mark encounters in the dept in CCWPL PEDPUL or CCWPL PEDMOS
+    encounters_df["is_peds_encounter"] = (encounters_df["dept"] == "CCWPL PEDPUL") | (
+        encounters_df["dept"] == "CCWPL PEDMOS"
+    )
+
+    # Mark well visits by visit type or diagnoses
+    encounters_df["is_well_visit"] = encounters_df["encounter_type"].isin(
+        WELL_ENCOUNTER_TYPES
+    ) | encounters_df["diagnoses"].str.match(WELL_ENCOUNTER_CODES_REGEX)
+
+    # ------------------------------------------------
+    # Empanel by location:
+    # 1. At least 3 visits in the last 2 years, and the last 3 were at peds
+    # 2. Last well visit was in the last 2 years AND it was at peds AND at least one of the last 3 visits was at peds
+    # 3. No well visit in 2 years AND at least 3 visits in the last 1 year AND majority with peds AND at least one of the last 3 visits was at peds
+    # 4. REMOVE those < 3yo that have not had any appt at peds for 15 months
+    # For now, we do not empanel to a specific provider
+    # ------------------------------------------------
+
+    # Get reference timestamps
+    now = pd.Timestamp.now()
+    two_years_ago = now - pd.DateOffset(years=2)
+    one_year_ago = now - pd.DateOffset(years=1)
+    fifteen_months_ago = now - pd.DateOffset(months=15)
+
+    # Filter encounters by time periods we'll need
+    recent_encounters = encounters_df[
+        encounters_df["encounter_date"] >= two_years_ago
+    ].copy()
+    last_year_encounters = encounters_df[
+        encounters_df["encounter_date"] >= one_year_ago
+    ].copy()
+
+    def get_last_n_encounters(df, prw_id, n=3):
+        """Helper function to get the last n encounters for a patient"""
+        return (
+            df[df["prw_id"] == prw_id]
+            .sort_values("encounter_date", ascending=False)
+            .head(n)
+        )
+
+    def meets_rule_1(prw_id):
+        """At least 3 visits in last 2 years, and last 3 were at peds"""
+        patient_encounters = recent_encounters[recent_encounters["prw_id"] == prw_id]
+        if patient_encounters["is_peds_encounter"].sum() < 3:
+            return False
+
+        last_three = get_last_n_encounters(patient_encounters, prw_id, 3)
+        return all(last_three["is_peds_encounter"])
+
+    def meets_rule_2(prw_id):
+        """Last well visit was in last 2 years AND at peds AND one of last 3 visits at peds"""
+        patient_encounters = recent_encounters[recent_encounters["prw_id"] == prw_id]
+
+        # Get last well visit
+        well_visits = patient_encounters[patient_encounters["is_well_visit"]]
+        if len(well_visits) == 0:
+            return False
+
+        last_well = well_visits.sort_values("encounter_date", ascending=False).iloc[0]
+        if not last_well["is_peds_encounter"]:
+            return False
+
+        # Check if at least one of last 3 visits was at peds
+        last_three = get_last_n_encounters(patient_encounters, prw_id, 3)
+        return any(last_three["is_peds_encounter"])
+
+    def meets_rule_3(prw_id):
+        """No well visit in 2 years AND 3+ visits in last year AND majority peds AND one of last 3 at peds"""
+        # Check if there are any well visits in last 2 years
+        recent_well_visits = recent_encounters[
+            (recent_encounters["prw_id"] == prw_id)
+            & (recent_encounters["is_well_visit"])
+        ]
+        if len(recent_well_visits) > 0:
+            return False
+
+        # Check last year's visits
+        last_year_patient = last_year_encounters[
+            last_year_encounters["prw_id"] == prw_id
+        ]
+        if len(last_year_patient) < 3:
+            return False
+
+        # Check if majority are peds
+        peds_visits = sum(last_year_patient["is_peds_encounter"])
+        if peds_visits <= len(last_year_patient) / 2:
+            return False
+
+        # Check if at least one of last 3 visits was at peds
+        last_three = get_last_n_encounters(encounters_df, prw_id, 3)
+        return any(last_three["is_peds_encounter"])
+
+    def should_remove_by_rule_4(prw_id):
+        """Remove if < 3yo and no peds appointment in 15 months"""
+        patient = patients_df[patients_df["prw_id"] == prw_id].iloc[0]
+
+        # Check if patient is under 3
+        if patient["age"] >= 3:
+            return False
+
+        # Check for any peds appointments in last 15 months
+        recent_peds = encounters_df[
+            (encounters_df["prw_id"] == prw_id)
+            & (encounters_df["encounter_date"] >= fifteen_months_ago)
+            & (encounters_df["is_peds_encounter"])
+        ]
+        return len(recent_peds) == 0
+
+    # Apply rules to each patient
+    empaneled_patients = []
+    for prw_id in patients_df["prw_id"]:
+        if meets_rule_1(prw_id) or meets_rule_2(prw_id) or meets_rule_3(prw_id):
+            if not should_remove_by_rule_4(prw_id):
+                empaneled_patients.append(prw_id)
+
+    # Update panel_location for empaneled patients
+    mask = patients_df["prw_id"].isin(empaneled_patients)
+    patients_df.loc[mask, "panel_location"] = "Palouse Pediatrics"
+
+    logging.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
 
 
 def transform_add_other_panels(src: SrcData):
@@ -106,16 +293,21 @@ def transform_add_other_panels(src: SrcData):
             provider can be determined) - Assigned to the provider who performed the last well exam
     4th Cut Patients who have seen multiple providers - Assigned to the last provider seen
     """
-    logging.info("Transforming data")
+    logging.info("Adding panel information")
     patients_df, encounters_df = src.patients_df, src.encounters_df
+
+    # Filter out patients that already have a panel provider or location
+    patients_df = patients_df[
+        (patients_df["panel_provider"].isna()) & (patients_df["panel_location"].isna())
+    ]
 
     # Initialize panel columns
     logging.info(f"Number of patients: {len(patients_df)}")
 
-    # Filter to encounters in the past year
-    one_year_ago = pd.Timestamp.now() - pd.DateOffset(years=1)
+    # Filter to encounters in the past 2 years
+    two_years_ago = pd.Timestamp.now() - pd.DateOffset(years=2)
     recent_encounters = encounters_df[
-        encounters_df["encounter_date"] >= one_year_ago
+        encounters_df["encounter_date"] >= two_years_ago
     ].copy()
 
     # Filter to recognized providers (those in the PROVIDER_TO_LOCATION map)
@@ -162,7 +354,9 @@ def transform_add_other_panels(src: SrcData):
                 {"prw_id": patient_id, "service_provider": majority_provider}
             )
 
-    majority_assignments_df = pd.DataFrame(majority_assignments)
+    majority_assignments_df = pd.DataFrame(
+        majority_assignments, columns=["prw_id", "service_provider"]
+    )
     logging.info(f"2nd cut assignments: {len(majority_assignments_df)}")
 
     # 3rd Cut: Assign to provider of last well visit for remaining patients
@@ -171,8 +365,11 @@ def transform_add_other_panels(src: SrcData):
     ]
 
     well_visits = recent_encounters[
-        recent_encounters["encounter_type"].isin(WELL_ENCOUNTER_TYPES)
-        & recent_encounters["prw_id"].isin(patients_after_2nd_cut["prw_id"])
+        recent_encounters["prw_id"].isin(patients_after_2nd_cut["prw_id"])
+        & (
+            recent_encounters["encounter_type"].isin(WELL_ENCOUNTER_TYPES)
+            | recent_encounters["diagnoses"].str.match(WELL_ENCOUNTER_CODES_REGEX)
+        )
     ].sort_values("encounter_date", ascending=False)
 
     last_well_assignments = (
@@ -226,8 +423,6 @@ def transform_add_other_panels(src: SrcData):
         "\n-----------------------------------------------------------------------------------\n",
     )
 
-    return patients_df
-
 
 def keep_panel_data(src: SrcData) -> OutData:
     """
@@ -274,7 +469,7 @@ def main():
         util.error_exit("ERROR: failed to read source data (see above)")
 
     # Transform data
-    # transform_add_peds_panels(src)
+    transform_add_peds_panels(src)
     transform_add_other_panels(src)
     out = keep_panel_data(src)
 

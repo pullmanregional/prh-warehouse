@@ -22,7 +22,7 @@ from prefect_github import GitHubCredentials
 from prefect_util import ingest_shell_op
 from prefect_aws import AwsCredentials
 
-EXTERNAL_CODE_DIR = pathlib.Path.home() / "repos"
+EXTERNAL_CODE_DIR = pathlib.Path.home() / ".prw" / "repos"
 
 # -----------------------------------------
 # Datamart ingest flow definitions

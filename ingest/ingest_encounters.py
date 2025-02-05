@@ -18,11 +18,11 @@ DATASET_ID = "encounters"
 # Config
 # -------------------------------------------------------
 # Default output to local SQLite DB.
-DEFAULT_PRW_DB_ODBC = "sqlite:///prw.sqlite3"
-DEFAULT_PRW_ID_DB_ODBC = "sqlite:///prw_id.sqlite3"
+DEFAULT_PRW_DB_ODBC = "sqlite:///../prw.sqlite3"
+DEFAULT_PRW_ID_DB_ODBC = "sqlite:///../prw_id.sqlite3"
 
 # Input files
-DEFAULT_DATA_DIR = "./data/encounters"
+DEFAULT_DATA_DIR = os.path.join("data", "encounters")
 
 # Logging configuration
 SHOW_SQL_IN_LOG = False

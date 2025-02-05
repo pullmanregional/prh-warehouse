@@ -14,7 +14,7 @@ from prw_model.prw_panel_model import *
 DATASET_ID = "patient_panel"
 
 # Default output to local SQLite DB.
-DEFAULT_PRW_DB_ODBC = "sqlite:///prw.sqlite3"
+DEFAULT_PRW_DB_ODBC = "sqlite:///../prw.sqlite3"
 
 # Logging definitions
 logging.basicConfig(level=logging.INFO)

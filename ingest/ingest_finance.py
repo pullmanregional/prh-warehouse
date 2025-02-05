@@ -20,10 +20,10 @@ INGEST_DATASET_ID = "finance"
 load_dotenv()
 
 # Default output to local SQLite DB.
-DEFAULT_PRW_DB_ODBC = "sqlite:///prw.sqlite3"
+DEFAULT_PRW_DB_ODBC = "sqlite:///../prw.sqlite3"
 
 # Input files
-DEFAULT_DATA_DIR = "./data/finance"
+DEFAULT_DATA_DIR = os.path.join("data", "finance")
 
 # Opt into pandas 3 behavior for replace() and fillna(), where columns of object dtype are NOT changed to something more specific,
 # like int/float/str. This option can be removed once upgrading pandas 2-> 3.

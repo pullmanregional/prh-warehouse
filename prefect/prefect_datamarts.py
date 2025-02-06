@@ -32,7 +32,7 @@ DEPLOYMENTS = [
         source=GitRepository(url="https://github.com/jonjlee-streamlit/prh-dash.git"),
         entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
     ).to_deployment(
-        name="prw-finance-dash",
+        name="prw-datamart-finance-dash",
     )
 ]
 
@@ -59,15 +59,15 @@ async def exec_deployment(deployment):
     # Set working directory to repo path
     os.chdir(repo_path)
 
-    # Split the deployment.entrypoint into python fileand function to call
-    module_name, function_name = deployment.entrypoint.split(":")
+    # Use prefect utilities to get the function reference from deployment.entrypoint
+    flow_fn = importtools.import_object(deployment.entrypoint)
+    is_async = asyncio.iscoroutinefunction(flow_fn)
+    print(
+        f"Loaded {deployment.entrypoint} -> {"async" if is_async else "(sync)"} {flow_fn.__name__}()"
+    )
 
-    # Convert relative python file to a module and then import it
-    module = importtools.load_script_as_module(str(repo_path / module_name))
-
-    # Call target function
-    flow_fn = getattr(module, function_name)
-    if asyncio.iscoroutinefunction(flow_fn):
+    # Call function
+    if is_async:
         await flow_fn()
     else:
         flow_fn()

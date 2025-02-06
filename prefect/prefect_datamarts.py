@@ -24,9 +24,13 @@ EXTERNAL_CODE_DIR = pathlib.Path.home() / ".prw" / "repos"
 # Datamart ingest flow definitions
 # -----------------------------------------
 DEPLOYMENTS = [
-    flow.from_source(
-        source=GitRepository(url="https://github.com/jonjlee-streamlit/prh-dash.git"),
-        entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
+    (
+        await flow.from_source(
+            source=GitRepository(
+                url="https://github.com/jonjlee-streamlit/prh-dash.git"
+            ),
+            entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
+        )
     ).to_deployment(
         name="prw-datamart-finance-dash",
     )

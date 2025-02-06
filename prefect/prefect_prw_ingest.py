@@ -8,29 +8,30 @@ from prefect.blocks.system import Secret
 from prefect_datamarts import datamart_ingest
 from prefect_util import pipenv_install_task, ingest_shell_op
 
-# Update path to include pipenv in the worker user's local bin
-os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin"
-
-# Path to current dir (prefect/) and ../ingest/ source directory
-CODE_ROOT = os.path.join(os.path.dirname(__file__))
-INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
-
-# Default to prod environment file
+# Load env vars from a .env file
+# load_dotenv() does NOT overwrite existing env vars that are set before running this script.
+# Look for the .env file in this file's directory
+# Actual .env file (eg .env.dev) depends on value of PRW_ENV. Default to prod.
 PRW_ENV = os.getenv("PRW_ENV", "prod")
-ENVS = {
+ENV_FILES = {
     "dev": ".env.dev",
     "prod": ".env.prod",
 }
-ENV_FILE = os.path.join(CODE_ROOT, ENVS.get(PRW_ENV))
+ENV_PATH = os.path.join(os.path.dirname(__file__), ENV_FILES.get(PRW_ENV))
+print(f"Using environment: {ENV_PATH}")
+load_dotenv(dotenv_path=ENV_PATH)
 
-# Load env vars from .env file, does not overwrite existing env variables,
-# then store config from env vars into constants
-print(f"Using environment: {ENV_FILE}")
-load_dotenv(dotenv_path=ENV_FILE)
+# Update path to include pipenv in the worker user's local bin
+os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin"
+
+# Load config from env vars into constants
 PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
 PRW_DB_ODBC = os.environ.get("PRW_DB_ODBC") or Secret.load("prw-db-url").get()
 PRW_ID_DB_ODBC = os.environ.get("PRW_ID_DB_ODBC") or Secret.load("prw-id-db-url").get()
+
+# Path to ../ingest/, where actual ingest subflow code is located
+INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
 
 # Subflows should drop tables before ingesting data. Will be set by --drop command line arg.
 DROP_FLAG = ""
@@ -75,7 +76,13 @@ async def prw_transform_patient_panel():
 # -----------------------------------------
 # Main entry point / parent flow
 # -----------------------------------------
-@flow(retries=0, retry_delay_seconds=300)
+def get_flow_name():
+    base_name = "prw-ingest"
+    env_prefix = f"{PRW_ENV}." if PRW_ENV != "prod" else ""
+    return f"{env_prefix}{base_name}"
+
+
+@flow(name=get_flow_name(), retries=0, retry_delay_seconds=300)
 async def prw_ingest(run_ingest=True, run_transform=True, run_datamart=True):
     # First, create/update the python virtual environment which is used by all subflows in ../ingest/
     await pipenv_install_task(working_dir=INGEST_CODE_ROOT)

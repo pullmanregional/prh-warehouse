@@ -51,7 +51,7 @@ if __name__ == "__main__":
             source=prh_warehouse_repo,
             entrypoint="prefect/prefect_prw_ingest.py:prw_ingest",
         ).to_deployment(
-            "prh-prw-ingest",
+            "prw-ingest",
             cron="0 9 * * *",  # Daily at 09:00 AM
         )
     )

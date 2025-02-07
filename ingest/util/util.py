@@ -19,6 +19,9 @@ def get_excel_files(dir_path):
     """
     Returns a list of Excel files in a given directory. Does not recurse.
     """
+    if not os.path.exists(dir_path):
+        return []
+
     return [
         os.path.join(dir_path, f)
         for f in os.listdir(dir_path)

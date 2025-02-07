@@ -5,8 +5,7 @@ import argparse
 from dotenv import load_dotenv
 from prefect import flow
 from prefect.blocks.system import Secret
-
-# from prefect_datamarts import datamart_ingest
+from prefect_datamarts import datamart_ingest
 from prefect_util import pipenv_install_task, ingest_shell_op
 
 # Load env vars from a .env file
@@ -77,26 +76,34 @@ async def prw_transform_patient_panel():
 # -----------------------------------------
 # Main entry point / parent flow
 # -----------------------------------------
-@flow(retries=0, retry_delay_seconds=300)
-async def prw_ingest():
+def get_flow_name():
+    base_name = "prw-ingest"
+    env_prefix = f"{PRW_ENV}." if PRW_ENV != "prod" else ""
+    return f"{env_prefix}{base_name}"
+
+
+@flow(name=get_flow_name(), retries=0, retry_delay_seconds=300)
+async def prw_ingest(run_ingest=True, run_transform=True, run_datamart=True):
     # First, create/update the python virtual environment which is used by all subflows in ../ingest/
     await pipenv_install_task(working_dir=INGEST_CODE_ROOT)
 
-    # Run ingest subflows
-    ingest_flows = [prw_ingest_encounters(), prw_ingest_finance()]
-    await asyncio.gather(*ingest_flows)
+    if run_ingest:
+        # Run ingest subflows
+        ingest_flows = [prw_ingest_encounters(), prw_ingest_finance()]
+        await asyncio.gather(*ingest_flows)
 
-    # Clean data
-    await prw_transform_clean_encounters()
+    if run_transform:
+        # Clean data
+        await prw_transform_clean_encounters()
 
-    # After ingest flows are complete, run transform flows, which calculate
-    # additional common columns that will be used across multiple applications
-    transform_flows = [prw_transform_patient_panel()]
-    await asyncio.gather(*transform_flows)
+        # After ingest flows are complete, run transform flows, which calculate
+        # additional common columns that will be used across multiple applications
+        transform_flows = [prw_transform_patient_panel()]
+        await asyncio.gather(*transform_flows)
 
-    # if run_datamart:
-    #     # Lastly create datamarts for each application
-    #     await datamart_ingest()
+    if run_datamart:
+        # Lastly create datamarts for each application
+        await datamart_ingest()
 
 
 if __name__ == "__main__":
@@ -132,4 +139,10 @@ if __name__ == "__main__":
     run_datamart = args.stage3_only or not (args.stage1_only or args.stage2_only)
 
     # Run the main ingest flow
-    asyncio.run(prw_ingest())
+    asyncio.run(
+        prw_ingest(
+            run_ingest=run_ingest,
+            run_transform=run_transform,
+            run_datamart=run_datamart,
+        )
+    )

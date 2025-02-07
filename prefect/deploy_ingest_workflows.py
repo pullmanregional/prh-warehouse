@@ -11,50 +11,40 @@ from prefect_github import GitHubCredentials
 # +------------- minute (0 - 59)
 
 if __name__ == "__main__":
-    flows = []
 
     # Provider schedules for staff scheduling calendar
     clinic_cal_repo = GitRepository(
         url="https://github.com/jonjlee/clinic-cal.git",
         credentials=GitHubCredentials.load("github-clinic-cal"),
     )
-    flows.append(
-        flow.from_source(
-            source=clinic_cal_repo,
-            entrypoint="prefect/clinic-cal-epic-ingest.py:clinic_cal_epic_ingest",
-        ).to_deployment(
-            "clinic-cal-epic-ingest",
-            cron="0 7-18 * * 1-5",  # Every hour, between 07:00 AM and 06:00 PM, Monday through Friday
-        )
+    flow.from_source(
+        source=clinic_cal_repo,
+        entrypoint="prefect/clinic-cal-epic-ingest.py:clinic_cal_epic_ingest",
+    ).deploy(
+        name="clinic-cal-epic-ingest",
+        cron="0 7-18 * * 1-5",  # Every hour, between 07:00 AM and 06:00 PM, Monday through Friday
+        work_pool_name="ingest",
     )
 
     # Financial dashboard data
-    prh_dash_repo = GitRepository(
-        url="https://github.com/jonjlee-streamlit/prh-dash.git"
-    )
-    flows.append(
-        flow.from_source(
-            source=prh_dash_repo,
-            entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
-        ).to_deployment(
-            "prh-dash-ingest",
-            cron="0 7-18 * * *",  # Every hour, between 07:00 AM and 06:00 PM every day
-        )
+    flow.from_source(
+        source="https://github.com/jonjlee-streamlit/prh-dash.git",
+        entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
+    ).deploy(
+        name="prh-dash-ingest",
+        cron="0 7-18 * * *",  # Every hour, between 07:00 AM and 06:00 PM every day
+        work_pool_name="ingest",
     )
 
     # Main warehouse ingest
-    prh_warehouse_repo = GitRepository(
-        url="https://github.com/pullmanregional/prh-warehouse.git"
+    prw_ingest_repo = GitRepository(
+        url="https://github.com/pullmanregional/prh-warehouse.git",
+        include_submodules=True,
     )
-    flows.append(
-        flow.from_source(
-            source=prh_warehouse_repo,
-            entrypoint="prefect/prefect_prw_ingest.py:prw_ingest",
-        ).to_deployment(
-            "prw-ingest",
-            cron="0 9 * * *",  # Daily at 09:00 AM
-        )
+    flow.from_source(
+        source=prw_ingest_repo,
+        entrypoint="prefect/prefect_prw_ingest.py:prw_ingest",
+    ).deploy(
+        name="prw-ingest",
+        work_pool_name="ingest",
     )
-
-    # Deploy all flows to run by workers in the "ingest" pool
-    deploy(*flows, work_pool_name="ingest")

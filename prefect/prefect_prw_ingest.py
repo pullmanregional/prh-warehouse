@@ -49,10 +49,9 @@ async def prw_ingest_encounters():
 
 @flow
 async def prw_ingest_finance():
-    # cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {DROP_FLAG}'
-    # print(f"Executing: {cmd}")
+    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {DROP_FLAG}'
+    print(f"Executing: {cmd}")
     # return await ingest_shell_op([cmd], working_dir=INGEST_CODE_ROOT)
-    pass
 
 
 # -----------------------------------------

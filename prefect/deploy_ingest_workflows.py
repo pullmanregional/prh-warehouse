@@ -11,7 +11,35 @@ from prefect_github import GitHubCredentials
 # +------------- minute (0 - 59)
 
 if __name__ == "__main__":
+    # ------------------------------------------------------------------
+    # Main ingest flow for warehouse
+    # ------------------------------------------------------------------
+    prw_ingest_repo = GitRepository(
+        url="https://github.com/pullmanregional/prh-warehouse.git",
+        include_submodules=True,
+    )
+    flow.from_source(
+        source=prw_ingest_repo,
+        entrypoint="prefect/prefect_prw_ingest.py:prw_ingest",
+    ).deploy(
+        name="prw-ingest",
+        work_pool_name="ingest",
+    )
 
+    # ------------------------------------------------------------------
+    # Datamart flows
+    # These flows are triggered by name by prefect_prw_ingest.py
+    # ------------------------------------------------------------------
+    flow.from_source(
+        source="https://github.com/jonjlee-streamlit/prh-dash.git",
+        entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
+    ).to_deployment(
+        name="prw-datamart-finance-dash",
+    )
+
+    # ------------------------------------------------------------------
+    # Miscellaneous
+    # ------------------------------------------------------------------
     # Provider schedules for staff scheduling calendar
     clinic_cal_repo = GitRepository(
         url="https://github.com/jonjlee/clinic-cal.git",
@@ -33,18 +61,5 @@ if __name__ == "__main__":
     ).deploy(
         name="prh-dash-ingest",
         cron="0 7-18 * * *",  # Every hour, between 07:00 AM and 06:00 PM every day
-        work_pool_name="ingest",
-    )
-
-    # Main warehouse ingest
-    prw_ingest_repo = GitRepository(
-        url="https://github.com/pullmanregional/prh-warehouse.git",
-        include_submodules=True,
-    )
-    flow.from_source(
-        source=prw_ingest_repo,
-        entrypoint="prefect/prefect_prw_ingest.py:prw_ingest",
-    ).deploy(
-        name="prw-ingest",
         work_pool_name="ingest",
     )

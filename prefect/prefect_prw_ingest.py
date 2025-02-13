@@ -1,3 +1,16 @@
+"""
+Main ingest workflow for the PRH data warehouse. This flow orchestrates the ingestion of data from various 
+source systems into the warehouse.
+
+The flow is deployed and scheduled via Prefect (see deploy_ingest_workflows.py). It:
+1. Sets up the Python environment using pipenv
+2. Executes individual ingest subflows for each data source
+3. Triggers datamart refresh flows after ingestion is complete
+
+Environment configuration is loaded from .env.* files based on PRW_ENV setting (defaults to prod).
+Datamart flows to execute are defined in the DATAMART_DEPLOYMENTS constant
+"""
+
 import os
 import pathlib
 import asyncio
@@ -5,8 +18,8 @@ import argparse
 from dotenv import load_dotenv
 from prefect import flow
 from prefect.blocks.system import Secret
-from prefect_datamarts import datamart_ingest
-from prefect_util import pipenv_install_task, ingest_shell_op
+from prefect.deployments import run_deployment
+from prefect_shell import shell_run_command
 
 # Load env vars from a .env file
 # load_dotenv() does NOT overwrite existing env vars that are set before running this script.
@@ -33,25 +46,35 @@ PRW_ID_DB_ODBC = os.environ.get("PRW_ID_DB_ODBC") or Secret.load("prw-id-db-url"
 # Path to ../ingest/, where actual ingest subflow code is located
 INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
 
-# Subflows should drop tables before ingesting data. Will be set by --drop command line arg.
-DROP_FLAG = ""
+# Datamart flow deployment names to execute as part of the ingest process
+# Format flows as "deployment-name/flow-name"
+# TODO: Move this to a Prefect block where deployments are registered in deploy_ingest_workflows.py
+DATAMART_DEPLOYMENTS = [
+    "prw-datamart-finance-dash/prh-dash-ingest",
+]
 
 
 # -----------------------------------------
 # Ingest source data processes
 # -----------------------------------------
 @flow
-async def prw_ingest_encounters():
-    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_DB_ODBC}" --id_out "{PRW_ID_DB_ODBC}" {DROP_FLAG}'
-    print(f"Executing: {cmd}")
-    return await ingest_shell_op([cmd], working_dir=INGEST_CODE_ROOT)
+async def prw_ingest_encounters(drop_tables=False):
+    drop_flag = "--drop" if drop_tables else ""
+    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_DB_ODBC}" --id_out "{PRW_ID_DB_ODBC}" {drop_flag}'
+    return await shell_run_command(
+        command=cmd,
+        cwd=INGEST_CODE_ROOT,
+    )
 
 
 @flow
-async def prw_ingest_finance():
-    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {DROP_FLAG}'
-    print(f"Executing: {cmd}")
-    # return await ingest_shell_op([cmd], working_dir=INGEST_CODE_ROOT)
+async def prw_ingest_finance(drop_tables=False):
+    drop_flag = "--drop" if drop_tables else ""
+    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {drop_flag}'
+    return await shell_run_command(
+        command=cmd,
+        cwd=INGEST_CODE_ROOT,
+    )
 
 
 # -----------------------------------------
@@ -59,18 +82,31 @@ async def prw_ingest_finance():
 # -----------------------------------------
 @flow
 async def prw_transform_clean_encounters():
-    return await ingest_shell_op(
-        [f'pipenv run python transform_clean_encounters.py -db "{PRW_DB_ODBC}"'],
-        working_dir=INGEST_CODE_ROOT,
+    return await shell_run_command(
+        command=f'pipenv run python transform_clean_encounters.py -db "{PRW_DB_ODBC}"',
+        cwd=INGEST_CODE_ROOT,
     )
 
 
 @flow
 async def prw_transform_patient_panel():
-    return await ingest_shell_op(
-        [f'pipenv run python transform_patient_panel.py -db "{PRW_DB_ODBC}"'],
-        working_dir=INGEST_CODE_ROOT,
+    return await shell_run_command(
+        command=f'pipenv run python transform_patient_panel.py -db "{PRW_DB_ODBC}"',
+        cwd=INGEST_CODE_ROOT,
     )
+
+
+# -----------------------------------------
+# Datamart ingest
+# -----------------------------------------
+async def datamart_ingest():
+    """Ask Prefect to start all datamart flows by names defined in DATAMART_DEPLOYMENTS"""
+    # Kick off flow runs for each deployment.
+    # timeout=0 means return immediately without waiting for the flow to complete.
+    # as_subflow=False means run the flow as a top-level flow, not as a subflow.
+    for deployment_name in DATAMART_DEPLOYMENTS:
+        print(f"Triggering datamart flow: {deployment_name}")
+        await run_deployment(name=deployment_name, timeout=0, as_subflow=False)
 
 
 # -----------------------------------------
@@ -83,13 +119,22 @@ def get_flow_name():
 
 
 @flow(name=get_flow_name(), retries=0, retry_delay_seconds=300)
-async def prw_ingest(run_ingest=True, run_transform=True, run_datamart=True):
+async def prw_ingest(
+    run_ingest=True, run_transform=True, run_datamart=True, drop_tables=False
+):
     # First, create/update the python virtual environment which is used by all subflows in ../ingest/
-    await pipenv_install_task(working_dir=INGEST_CODE_ROOT)
+    await shell_run_command(
+        command="pipenv install -v",
+        env={"PIPENV_IGNORE_VIRTUALENVS": "1"},
+        cwd=INGEST_CODE_ROOT,
+    )
 
     if run_ingest:
         # Run ingest subflows
-        ingest_flows = [prw_ingest_encounters(), prw_ingest_finance()]
+        ingest_flows = [
+            prw_ingest_encounters(drop_tables),
+            prw_ingest_finance(drop_tables),
+        ]
         await asyncio.gather(*ingest_flows)
 
     if run_transform:
@@ -106,7 +151,11 @@ async def prw_ingest(run_ingest=True, run_transform=True, run_datamart=True):
         await datamart_ingest()
 
 
-if __name__ == "__main__":
+def run_as_script():
+    """
+    This function is used when executed directly (not via Prefect).
+    It provides a CLI for running the ingest flow in different stages.
+    """
     parser = argparse.ArgumentParser(
         description="Main Ingest Prefect Flow for PRH warehouse."
     )
@@ -131,7 +180,6 @@ if __name__ == "__main__":
         help="Drop and recreate tables before ingesting data",
     )
     args = parser.parse_args()
-    DROP_FLAG = "--drop" if args.drop else ""
 
     # Determine which subflows to run based on command line args
     run_ingest = args.stage1_only or not (args.stage2_only or args.stage3_only)
@@ -144,5 +192,12 @@ if __name__ == "__main__":
             run_ingest=run_ingest,
             run_transform=run_transform,
             run_datamart=run_datamart,
+            drop_tables=args.drop,
         )
     )
+
+
+if __name__ == "__main__":
+    # This module is primary executed by Prefect with prw_ingest() as the main entry point.
+    # This file can also be executed directly for testing, and run_as_script() provides a CLI
+    run_as_script()

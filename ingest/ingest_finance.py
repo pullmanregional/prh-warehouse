@@ -16,9 +16,6 @@ from prw_model.prw_finance_model import *
 # Unique identifier for this ingest dataset
 INGEST_DATASET_ID = "finance"
 
-# Load environment from .env file, does not overwrite existing env variables
-load_dotenv()
-
 # Default output to local SQLite DB.
 DEFAULT_PRW_DB_ODBC = "sqlite:///../prw.sqlite3"
 

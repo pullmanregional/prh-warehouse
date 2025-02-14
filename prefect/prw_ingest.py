@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 from prefect import flow
 from prefect.blocks.system import Secret
 from prefect.deployments import run_deployment
-from prefect_shell import shell_run_command
+from prefect_util import shell_op
 
 # Load env vars from a .env file
 # load_dotenv() does NOT overwrite existing env vars that are set before running this script.
@@ -61,7 +61,7 @@ DATAMART_DEPLOYMENTS = [
 async def prw_ingest_encounters(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
     cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_DB_ODBC}" --id_out "{PRW_ID_DB_ODBC}" {drop_flag}'
-    return await shell_run_command(
+    return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
     )
@@ -71,7 +71,7 @@ async def prw_ingest_encounters(drop_tables=False):
 async def prw_ingest_finance(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
     cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {drop_flag}'
-    return await shell_run_command(
+    return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
     )
@@ -82,7 +82,7 @@ async def prw_ingest_finance(drop_tables=False):
 # -----------------------------------------
 @flow
 async def prw_transform_clean_encounters():
-    return await shell_run_command(
+    return await shell_op(
         command=f'pipenv run python transform_clean_encounters.py -db "{PRW_DB_ODBC}"',
         cwd=INGEST_CODE_ROOT,
     )
@@ -90,7 +90,7 @@ async def prw_transform_clean_encounters():
 
 @flow
 async def prw_transform_patient_panel():
-    return await shell_run_command(
+    return await shell_op(
         command=f'pipenv run python transform_patient_panel.py -db "{PRW_DB_ODBC}"',
         cwd=INGEST_CODE_ROOT,
     )
@@ -123,10 +123,12 @@ async def prw_ingest(
     run_ingest=True, run_transform=True, run_datamart=True, drop_tables=False
 ):
     # First, create/update the python virtual environment which is used by all subflows in ../ingest/
-    await shell_run_command(
+    # The PIPENV_IGNORE_VIRTUALENVS env var instructs pipenv to install dependencies from the Pipfile 
+    # in the current directory (../ingest) into the current venv (prefect-prh-warehouse).
+    await shell_op(
         command="pipenv install -v",
         env={"PIPENV_IGNORE_VIRTUALENVS": "1"},
-        cwd=INGEST_CODE_ROOT,
+        cwd=INGEST_CODE_ROOT
     )
 
     if run_ingest:

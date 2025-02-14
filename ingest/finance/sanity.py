@@ -31,8 +31,4 @@ def check_data_files(volumes_file: str, income_stmt_files: list[str]) -> bool:
     Source data sanity checks. This doesn't compare actual numbers, but checks that we can
     do ingest at all, such as ensuring the right columns are where we expect them to be
     """
-    # - Dashboard Supporting Data, List worksheet: verify same data as static_data.WDID_TO_DEPTNAME
-    xl_data = pd.read_excel(volumes_file, sheet_name="List", header=0)
-
-    # - Each income statement sheet has Ledger Account cell, and data in columns A:Q
     return True

@@ -81,7 +81,7 @@ def read_budget_data(filename, budget_sheet, hrs_per_volume_sheet, uos_sheet):
     logging.info(f"Reading {filename}, {budget_sheet}")
     xl_data = pd.read_excel(filename, sheet_name=budget_sheet, header=None)
     budget_df = pandas_utils.df_get_tables_by_rows(
-        xl_data, cols="B:K", start_row_idx=6, limit=1
+        xl_data, cols="A:J", start_row_idx=6, limit=1
     )
     budget_df = budget_df[0]
     budget_df.columns = [
@@ -388,6 +388,12 @@ def read_hours_and_fte_data(files):
         (row_start, _col) = pandas_utils.df_find_by_column(xl_data, "Department Number")
         hours_df = xl_data.iloc[row_start:]
         hours_df = pandas_utils.df_convert_first_row_to_column_names(hours_df)
+
+        # Drop columns before "Department Number" column (some of the later reports after 2025 have a "Period" column in column 1)
+        dept_num_col_idx = hours_df.columns.get_loc("Department Number")
+        hours_df = hours_df.iloc[:, dept_num_col_idx:]
+
+        # Rename subsequent columns after Department Number and Department Name
         hours_df.columns.values[2] = "reg_hrs"
         hours_df.columns.values[3] = "CALLBK - CALLBACK"
         hours_df.columns.values[4] = "DBLTME - DOUBLETIME"

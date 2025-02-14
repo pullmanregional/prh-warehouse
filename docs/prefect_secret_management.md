@@ -17,7 +17,7 @@ pip install "prefect[github,aws]"
 
 Remember to set the Python interpreter in VSCode after doing `pip install`, since this project doesn't use pipenv yet.
 
-Then you can import and use the blocks to retrieve a secret by name. For example, see `prefect/deploy_ingest_workflows.py`:
+Then you can import and use the blocks to retrieve a secret by name. For example, see `prefect/prw_deploy.py`:
 ```
 from prefect import flow, deploy
 from prefect.runner.storage import GitRepository

@@ -55,7 +55,7 @@ For flows that need `pipenv` to install dependencies, like `prh-dash`:
 # Prefect Deployments
 
 * These are named groups of flows that are defined by python files in `prh-warehouse/prefect`
-* Deployments can be seen as *code as configuration*. For example, see the contents of `prefect/deploy_ingest_workflows.py` to see the source repository and cron schedule for the `clinic-cal-epic-ingest` flow.
+* Deployments can be seen as *code as configuration*. For example, see the contents of `prefect/prw_deploy.py` to see the source repository and cron schedule for the `clinic-cal-epic-ingest` flow.
 * Each deployment can have a set schedule for executing and be assigned to a **Prefect Work Pool**
 * A deployment can be manually started as well using:
   ```

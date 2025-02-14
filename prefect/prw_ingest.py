@@ -2,7 +2,7 @@
 Main ingest workflow for the PRH data warehouse. This flow orchestrates the ingestion of data from various 
 source systems into the warehouse.
 
-The flow is deployed and scheduled via Prefect (see deploy_ingest_workflows.py). It:
+The flow is deployed and scheduled via Prefect (see prw_deploy.py). It:
 1. Sets up the Python environment using pipenv
 2. Executes individual ingest subflows for each data source
 3. Triggers datamart refresh flows after ingestion is complete
@@ -48,7 +48,7 @@ INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
 
 # Datamart flow deployment names to execute as part of the ingest process
 # Format flows as "deployment-name/flow-name"
-# TODO: Move this to a Prefect block where deployments are registered in deploy_ingest_workflows.py
+# TODO: Move this to a Prefect block where deployments are registered in prw_deploy.py
 DATAMART_DEPLOYMENTS = [
     "prw-datamart-finance-dash/prh-dash-ingest",
 ]

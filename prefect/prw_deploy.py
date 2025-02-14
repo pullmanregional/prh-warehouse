@@ -20,7 +20,7 @@ if __name__ == "__main__":
     )
     flow.from_source(
         source=prw_ingest_repo,
-        entrypoint="prefect/prefect_prw_ingest.py:prw_ingest",
+        entrypoint="prefect/prw_ingest.py:prw_ingest",
     ).deploy(
         name="prw-ingest",
         work_pool_name="ingest",
@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     # ------------------------------------------------------------------
     # Datamart flows
-    # These flows are triggered by name by prefect_prw_ingest.py
+    # These flows are triggered by name by prw_ingest.py
     # ------------------------------------------------------------------
     flow.from_source(
         source="https://github.com/jonjlee-streamlit/prh-dash.git",

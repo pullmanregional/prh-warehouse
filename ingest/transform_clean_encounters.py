@@ -4,6 +4,8 @@ import argparse
 from sqlmodel import Session, select
 from util import util, db_utils, prw_meta_utils
 from prw_model.prw_model import *
+from sqlalchemy import update
+from sqlalchemy.sql.expression import bindparam
 
 # -------------------------------------------------------
 # Config
@@ -24,33 +26,58 @@ SHOW_SQL_IN_LOG = False
 # -------------------------------------------------------
 def clean_encounters(prw_session: Session):
     """
-    Updates db tables directly to clean source data
+    Updates db tables directly to clean source data:
+    1. Remove trailing " [<id>]" in dept, encounter_type, service_provider, billing_provider
     """
     logging.info("Cleaning encounters table")
+    COLUMNS_TO_CLEAN = ['dept', 'encounter_type', 'service_provider', 'billing_provider']   
 
-    # Stream rows from SQL table, rewrite with regexes:
-    # - Remove trailing " [<id>]" in dept, encounter_type, service_provider, billing_provider
-    query = prw_session.exec(select(PrwEncounter)).yield_per(10000)
+    # Use SQLAlchemy core for more efficient bulk updates
     trailing_id_re = re.compile(r"\s*\[[^\]]*\]\s*$")
-    for encounter in query:
-        if encounter.dept:
-            dept = trailing_id_re.sub("", encounter.dept)
-            if dept != encounter.dept:
-                encounter.dept = dept
-        if encounter.encounter_type:
-            encounter_type = trailing_id_re.sub("", encounter.encounter_type)
-            if encounter_type != encounter.encounter_type:
-                encounter.encounter_type = encounter_type
-        if encounter.service_provider:
-            service_provider = trailing_id_re.sub("", encounter.service_provider)
-            if service_provider != encounter.service_provider:
-                encounter.service_provider = service_provider
-        if encounter.billing_provider:
-            billing_provider = trailing_id_re.sub("", encounter.billing_provider)
-            if billing_provider != encounter.billing_provider:
-                encounter.billing_provider = billing_provider
+    table = PrwEncounter.__table__
+    
+    # Process in batches, typically 500-2k rows is ideal
+    batch_size = 1000
+    last_id = 0
+    while True:
+        # Get a batch of records to clean
+        batch = prw_session.exec(
+            select(PrwEncounter)
+            .where(PrwEncounter.id > last_id)
+            .order_by(PrwEncounter.id)
+            .limit(batch_size)
+        ).all()        
 
-    prw_session.flush()
+        if not batch:
+            break
+            
+        # Trim "[id]" from values in the specified columns; only update if changed
+        updates = []
+        for encounter in batch:
+            update_data = {}
+            for field in COLUMNS_TO_CLEAN:
+                original = getattr(encounter, field)
+                if original:
+                    cleaned = trailing_id_re.sub("", original)
+                    update_data[field] = cleaned
+                else:
+                    update_data[field] = ""
+            if update_data:
+                update_data['updt_id'] = encounter.id
+                updates.append(update_data)
+        
+        # Execute the upddate batch
+        if updates:
+            stmt = update(table).where(table.c.id == bindparam('updt_id'))
+            for field in COLUMNS_TO_CLEAN:
+                stmt = stmt.values(**{field: bindparam(field)})
+            
+            prw_session.exec(stmt, params=updates)
+            prw_session.commit()
+
+        # Remove processed batch to free resources
+        last_id = batch[-1].id
+        prw_session.expire_all()
 
 
 # -------------------------------------------------------

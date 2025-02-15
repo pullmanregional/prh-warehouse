@@ -39,6 +39,7 @@ def clean_encounters(prw_session: Session):
     # Process in batches, typically 500-2k rows is ideal
     batch_size = 1000
     last_id = 0
+    total_processed = 0
     while True:
         # Get a batch of records to clean
         batch = prw_session.exec(
@@ -75,8 +76,10 @@ def clean_encounters(prw_session: Session):
             prw_session.exec(stmt, params=updates)
             prw_session.commit()
 
-        # Remove processed batch to free resources
+        # Remove processed batch to free resources and log progress
+        total_processed += len(batch)
         last_id = batch[-1].id
+        logging.info(f"Processed batch of {len(batch)} records, {total_processed} total")
         prw_session.expire_all()
 
 

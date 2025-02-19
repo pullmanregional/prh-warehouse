@@ -32,9 +32,10 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     flow.from_source(
         source="https://github.com/jonjlee-streamlit/prh-dash.git",
-        entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
-    ).to_deployment(
-        name="prw-datamart-finance-dash",
+        entrypoint="prefect/flow.py:prh_datamart_finance",
+    ).deploy(
+        name="prw-datamart-finance",
+        work_pool_name="ingest",
     )
 
     # ------------------------------------------------------------------

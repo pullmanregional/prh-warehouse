@@ -142,6 +142,7 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     # Convert MRN to string
     patients_df["mrn"] = patients_df["mrn"].astype(str)
     encounters_df["mrn"] = encounters_df["mrn"].astype(str)
+    encounters_df["with_pcp"] = encounters_df["with_pcp"].astype(bool)
 
     # Force encounter_date to be date only, no time
     encounters_df["encounter_date"] = pd.to_datetime(
@@ -194,12 +195,12 @@ def calc_patient_age(patients_df: pd.DataFrame):
         lambda dob: relativedelta(now, dob).years
     )
     patients_df["age_in_mo_under_3"] = patients_df["dob"].apply(
-        lambda dob: (
-            relativedelta(now, dob).years * 12 + relativedelta(now, dob).months
-            if relativedelta(now, dob).years <= 2
-            else None
-        )
+        lambda dob: relativedelta(now, dob).years * 12 + relativedelta(now, dob).months
+        if relativedelta(now, dob).years <= 2
+        else None
     )
+    # Convert to integer type
+    patients_df["age_in_mo_under_3"] = patients_df["age_in_mo_under_3"].astype("Int64")
     return patients_df
 
 
@@ -229,6 +230,8 @@ def calc_age_at_encounter(encounters_df: pd.DataFrame, patients_df: pd.DataFrame
         ),
         axis=1,
     )
+    # Convert to integer type
+    encounters_df["encounter_age_in_mo_under_3"] = encounters_df["encounter_age_in_mo_under_3"].astype("Int64")
     encounters_df.drop(columns=["dob"], inplace=True)
 
     return encounters_df

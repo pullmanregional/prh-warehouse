@@ -2,6 +2,7 @@ import re
 import urllib.parse
 import logging
 import time
+import numpy as np
 import pandas as pd
 import sqlalchemy
 from typing import List
@@ -36,7 +37,11 @@ def get_db_connection(odbc_str: str, echo: bool = False) -> sqlalchemy.Engine:
 
     # Use SQLModel to establish connection to DB
     try:
-        engine = create_engine(conn_str, echo=echo)
+        if conn_str.startswith('mssql'):
+            # Optimize with fast_executemany, which is supported by MSSQL / Azure SQL
+            engine = create_engine(conn_str, echo=echo, fast_executemany=True)
+        else:
+            engine = create_engine(conn_str, echo=echo)
         return engine
     except Exception as e:
         logging.error(f"ERROR: failed to connect to DB")
@@ -58,25 +63,35 @@ def _convert_df_dtypes_to_db(table_data: TableData, table_columns: List[str]):
     Convert dataframe columns to match database column types by
     mapping SQLAlchemy types to pandas-compatible dtypes
     """
+    df = table_data.df
     for col in table_columns:
-        if col in table_data.df.columns:
+        if col in df.columns:
             sa_column = table_data.table.__table__.columns[col]
+            current_dtype = str(df[col].dtype)
+            
             if isinstance(sa_column.type, sqlalchemy.String):
-                dtype = "object"
+                target_dtype = "object"
             elif isinstance(sa_column.type, sqlalchemy.Integer):
-                dtype = "int64"
+                # Use pandas nullable integer type if there are NaNs
+                target_dtype = "Int64" if df[col].isna().any() else "int64"
             elif isinstance(sa_column.type, sqlalchemy.Float):
-                dtype = "float64"
-            elif isinstance(sa_column.type, sqlalchemy.DateTime):
-                dtype = "datetime64[ns]"
+                target_dtype = "float64"
+            elif isinstance(sa_column.type, sqlalchemy.DateTime) or isinstance(sa_column.type, sqlalchemy.Date):
+                target_dtype = "datetime64[ns]"
+            elif isinstance(sa_column.type, sqlalchemy.Boolean):
+                target_dtype = "bool"
             else:
-                dtype = "object"
+                target_dtype = "object"
 
-            table_data.df[col] = table_data.df[col].astype(dtype)
+            # Only convert if needed
+            if current_dtype != target_dtype:
+                logging.info(f"Converting column {col} from {current_dtype} to {target_dtype}")
+                # Can use .copy() to avoid SettingWithCopyWarning
+                df[col] = df[col].astype(target_dtype, copy=False)
 
 
 def clear_tables_and_insert_data(
-    session: Session, tables_data: List[TableData], chunk_size: int = 500
+    session: Session, tables_data: List[TableData], chunk_size: int = 100000
 ):
     """
     Write data from dataframes to DB tables, clearing and overwriting existing tables

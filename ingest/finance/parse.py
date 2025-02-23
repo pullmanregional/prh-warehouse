@@ -157,7 +157,7 @@ def read_contracted_hours_data(filename, sheet):
     # Get the last updated month from the top of the sheet
     contracted_hours_updated_month = pandas_utils.df_get_val_or_range(xl_data, "G1")
     contracted_hours_updated_month_df = pd.DataFrame(
-        {"contracted_hours_updated_month": [contracted_hours_updated_month]}
+        {"contracted_hours_updated_month": [str(contracted_hours_updated_month)]}
     )
 
     # Rename columns, which appear in groups of 3 for eac year:

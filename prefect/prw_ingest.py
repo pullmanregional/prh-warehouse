@@ -126,7 +126,7 @@ async def prw_ingest(
     # The PIPENV_IGNORE_VIRTUALENVS env var instructs pipenv to install dependencies from the Pipfile 
     # in the current directory (../ingest) into the current venv (prefect-prh-warehouse).
     await shell_op(
-        command="pipenv install -v",
+        command="pipenv install",
         env={"PIPENV_IGNORE_VIRTUALENVS": "1"},
         cwd=INGEST_CODE_ROOT
     )

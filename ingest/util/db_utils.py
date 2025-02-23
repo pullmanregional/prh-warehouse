@@ -1,6 +1,7 @@
 import re
 import urllib.parse
 import logging
+import time
 import pandas as pd
 import sqlalchemy
 from typing import List
@@ -52,31 +53,68 @@ def clear_tables(session: Session, tables: List[SQLModel]):
         session.exec(delete(table))
 
 
+def _convert_df_dtypes_to_db(table_data: TableData, table_columns: List[str]):
+    """
+    Convert dataframe columns to match database column types by
+    mapping SQLAlchemy types to pandas-compatible dtypes
+    """
+    for col in table_columns:
+        if col in table_data.df.columns:
+            sa_column = table_data.table.__table__.columns[col]
+            if isinstance(sa_column.type, sqlalchemy.String):
+                dtype = "object"
+            elif isinstance(sa_column.type, sqlalchemy.Integer):
+                dtype = "int64"
+            elif isinstance(sa_column.type, sqlalchemy.Float):
+                dtype = "float64"
+            elif isinstance(sa_column.type, sqlalchemy.DateTime):
+                dtype = "datetime64[ns]"
+            else:
+                dtype = "object"
+
+            table_data.df[col] = table_data.df[col].astype(dtype)
+
+
 def clear_tables_and_insert_data(
-    session: Session, tables_data: List[TableData], chunk_size: int = 25000
+    session: Session, tables_data: List[TableData], chunk_size: int = 500
 ):
     """
     Write data from dataframes to DB tables, clearing and overwriting existing tables
     """
     for table_data in tables_data:
-        logging.info(f"Writing data to table: {table_data.table.__tablename__}")
+        logging.info(
+            f"Writing data to table: {table_data.table.__tablename__}, rows: {len(table_data.df)}"
+        )
 
         # Clear data in DB
+        logging.info(f"Clearing table: {table_data.table.__tablename__}")
         session.exec(delete(table_data.table))
 
-        # Select columns from dataframe that match table columns, except "id" column
+        # Select columns from dataframe that match table columns
         table_columns = table_data.table.__table__.columns.keys()
-        table_columns.remove("id")
 
         # Remove columns that aren't in the dataframe
         table_columns = [col for col in table_columns if col in table_data.df.columns]
 
+        # Remove the PK column from the dataframe, which will be computed by the DB
+        if table_data.table.__table__.primary_key.columns.keys()[0] in table_columns:
+            table_columns.remove(
+                table_data.table.__table__.primary_key.columns.keys()[0]
+            )
+
+        # Convert dataframe datatypes to match DB types
+        _convert_df_dtypes_to_db(table_data, table_columns)
+
         # Write data from dataframe
+        start_time = time.time()
+        logging.info(f"Writing table: {table_data.table.__tablename__}")
         df = table_data.df[table_columns]
         df.to_sql(
             name=table_data.table.__tablename__,
             con=session.connection(),
-            if_exists="append",
+            if_exists="append", 
             index=False,
             chunksize=chunk_size,
         )
+        elapsed_time = time.time() - start_time
+        logging.info(f"Wrote {len(df)} rows to {table_data.table.__tablename__} in {elapsed_time:.2f}s")

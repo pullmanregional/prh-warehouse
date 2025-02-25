@@ -3,7 +3,7 @@ Print the Data Definition Language (DDL) statements for the PRW model.
 """
 
 from sqlalchemy import create_mock_engine
-from prw_model import *
+from prw_common.model import *
 
 
 def dump(sql, *multiparams, **params):

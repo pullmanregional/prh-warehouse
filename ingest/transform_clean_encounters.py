@@ -3,7 +3,7 @@ import logging
 import argparse
 from sqlmodel import Session, select
 from util import util, db_utils, prw_meta_utils
-from prw_model.prw_model import *
+from prw_common.model.prw_model import *
 from sqlalchemy import update
 from sqlalchemy.sql.expression import bindparam
 
@@ -14,7 +14,7 @@ from sqlalchemy.sql.expression import bindparam
 DATASET_ID = "CLEAN_ENCOUNTERS"
 
 # Default output to local SQLite DB.
-DEFAULT_PRW_DB_ODBC = "sqlite:///../prw.sqlite3"
+DEFAULT_PRW_CONN = "sqlite:///../prw.sqlite3"
 
 # Logging definitions
 logging.basicConfig(level=logging.INFO)
@@ -93,7 +93,7 @@ def parse_arguments():
     parser.add_argument(
         "-db",
         help='DB connection string including credentials. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=DEFAULT_PRW_DB_ODBC,
+        default=DEFAULT_PRW_CONN,
     )
     return parser.parse_args()
 

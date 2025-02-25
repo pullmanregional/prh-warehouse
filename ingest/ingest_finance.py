@@ -8,7 +8,7 @@ from sqlmodel import Session
 from finance import sanity, parse, transform
 from util import util, db_utils, prw_meta_utils
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
-from prw_model.prw_finance_model import *
+from prw_common.model.prw_finance_model import *
 
 # -------------------------------------------------------
 # Config
@@ -17,7 +17,7 @@ from prw_model.prw_finance_model import *
 INGEST_DATASET_ID = "finance"
 
 # Default output to local SQLite DB.
-DEFAULT_PRW_DB_ODBC = "sqlite:///../prw.sqlite3"
+DEFAULT_PRW_CONN = "sqlite:///../prw.sqlite3"
 
 # Input files
 DEFAULT_DATA_DIR = os.path.join("data", "finance")
@@ -81,7 +81,7 @@ def parse_arguments():
         "-o",
         "--out",
         help='Output DB connection string, including credentials if needed. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=DEFAULT_PRW_DB_ODBC,
+        default=DEFAULT_PRW_CONN,
     )
     parser.add_argument(
         "--drop",

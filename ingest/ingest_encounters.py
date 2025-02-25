@@ -7,7 +7,7 @@ from typing import List
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from sqlmodel import Session, select, inspect
-from prw_model import prw_model, prw_id_model
+from prw_common.model import prw_model, prw_id_model
 from util import prw_id_utils, db_utils, util, prw_meta_utils
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
 
@@ -18,8 +18,8 @@ DATASET_ID = "encounters"
 # Config
 # -------------------------------------------------------
 # Default output to local SQLite DB.
-DEFAULT_PRW_DB_ODBC = "sqlite:///../prw.sqlite3"
-DEFAULT_PRW_ID_DB_ODBC = "sqlite:///../prw_id.sqlite3"
+DEFAULT_PRW_CONN = "sqlite:///../prw.sqlite3"
+DEFAULT_PRW_ID_CONN = "sqlite:///../prw_id.sqlite3"
 
 # Input files
 DEFAULT_DATA_DIR = os.path.join("data", "encounters")
@@ -280,12 +280,12 @@ def parse_arguments():
         "-o",
         "--out",
         help='Output DB connection string, including credentials if needed. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=DEFAULT_PRW_DB_ODBC,
+        default=DEFAULT_PRW_CONN,
     )
     parser.add_argument(
         "--id_out",
         help="Output connection string for ID DB, or 'None' to skip",
-        default=DEFAULT_PRW_ID_DB_ODBC,
+        default=DEFAULT_PRW_ID_CONN,
     )
     parser.add_argument(
         "--drop",

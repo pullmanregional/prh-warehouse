@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from sqlmodel import Session, select, delete
-from prw_model import prw_meta_model
+from prw_common.model import prw_meta_model
 
 
 def write_meta(session: Session, dataset: str, modified: dict = None):

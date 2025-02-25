@@ -40,8 +40,8 @@ os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin"
 # Load config from env vars into constants
 PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
-PRW_DB_ODBC = os.environ.get("PRW_DB_ODBC") or Secret.load("prw-db-url").get()
-PRW_ID_DB_ODBC = os.environ.get("PRW_ID_DB_ODBC") or Secret.load("prw-id-db-url").get()
+PRW_CONN = os.environ.get("PRW_CONN") or Secret.load("prw-db-url").get()
+PRW_ID_CONN = os.environ.get("PRW_ID_CONN") or Secret.load("prw-id-db-url").get()
 
 # Path to ../ingest/, where actual ingest subflow code is located
 INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
@@ -60,7 +60,7 @@ DATAMART_DEPLOYMENTS = [
 @flow
 async def prw_ingest_encounters(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_DB_ODBC}" --id_out "{PRW_ID_DB_ODBC}" {drop_flag}'
+    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_CONN}" --id_out "{PRW_ID_CONN}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -70,7 +70,7 @@ async def prw_ingest_encounters(drop_tables=False):
 @flow
 async def prw_ingest_finance(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_DB_ODBC}" {drop_flag}'
+    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_CONN}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -83,7 +83,7 @@ async def prw_ingest_finance(drop_tables=False):
 @flow
 async def prw_transform_clean_encounters():
     return await shell_op(
-        command=f'pipenv run python transform_clean_encounters.py -db "{PRW_DB_ODBC}"',
+        command=f'pipenv run python transform_clean_encounters.py -db "{PRW_CONN}"',
         cwd=INGEST_CODE_ROOT,
     )
 
@@ -91,7 +91,7 @@ async def prw_transform_clean_encounters():
 @flow
 async def prw_transform_patient_panel():
     return await shell_op(
-        command=f'pipenv run python transform_patient_panel.py -db "{PRW_DB_ODBC}"',
+        command=f'pipenv run python transform_patient_panel.py -db "{PRW_CONN}"',
         cwd=INGEST_CODE_ROOT,
     )
 
@@ -112,13 +112,7 @@ async def datamart_ingest():
 # -----------------------------------------
 # Main entry point / parent flow
 # -----------------------------------------
-def get_flow_name():
-    base_name = "prw-ingest"
-    env_prefix = f"{PRW_ENV}." if PRW_ENV != "prod" else ""
-    return f"{env_prefix}{base_name}"
-
-
-@flow(name=get_flow_name(), retries=0, retry_delay_seconds=300)
+@flow(name="prw-ingest" + f".{PRW_ENV}" if PRW_ENV != "prod" else "", retries=0, retry_delay_seconds=300)
 async def prw_ingest(
     run_ingest=True, run_transform=True, run_datamart=True, drop_tables=False
 ):

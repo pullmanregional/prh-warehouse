@@ -6,15 +6,12 @@ from util import util, db_utils, prw_meta_utils
 from prw_common.model.prw_model import *
 from sqlalchemy import update
 from sqlalchemy.sql.expression import bindparam
-
+from prw_common.cli_utils import cli_parser
 # -------------------------------------------------------
 # Config
 # -------------------------------------------------------
 # Unique identifier for this ingest dataset
 DATASET_ID = "CLEAN_ENCOUNTERS"
-
-# Default output to local SQLite DB.
-DEFAULT_PRW_CONN = "sqlite:///../prw.sqlite3"
 
 # Logging definitions
 logging.basicConfig(level=logging.INFO)
@@ -87,13 +84,9 @@ def clean_encounters(prw_session: Session):
 # Main entry point
 # -------------------------------------------------------
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="Clean up raw encounter data in PRH warehouse."
-    )
-    parser.add_argument(
-        "-db",
-        help='DB connection string including credentials. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=DEFAULT_PRW_CONN,
+    parser = cli_parser(
+        description="Clean up raw encounter data in PRH warehouse.",
+        require_prw=True,
     )
     return parser.parse_args()
 
@@ -101,7 +94,7 @@ def parse_arguments():
 def main():
     # Load config from cmd line
     args = parse_arguments()
-    db_url = args.db
+    db_url = args.prw
 
     logging.info(f"DB: {util.mask_pw(db_url)}")
 

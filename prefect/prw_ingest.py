@@ -60,7 +60,7 @@ DATAMART_DEPLOYMENTS = [
 @flow
 async def prw_ingest_encounters(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -o "{PRW_CONN}" --id_out "{PRW_ID_CONN}" {drop_flag}'
+    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -prw "{PRW_CONN}" -prwid "{PRW_ID_CONN}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -70,7 +70,7 @@ async def prw_ingest_encounters(drop_tables=False):
 @flow
 async def prw_ingest_finance(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -o "{PRW_CONN}" {drop_flag}'
+    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -prw "{PRW_CONN}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -83,7 +83,7 @@ async def prw_ingest_finance(drop_tables=False):
 @flow
 async def prw_transform_clean_encounters():
     return await shell_op(
-        command=f'pipenv run python transform_clean_encounters.py -db "{PRW_CONN}"',
+        command=f'pipenv run python transform_clean_encounters.py -prw "{PRW_CONN}"',
         cwd=INGEST_CODE_ROOT,
     )
 
@@ -91,7 +91,7 @@ async def prw_transform_clean_encounters():
 @flow
 async def prw_transform_patient_panel():
     return await shell_op(
-        command=f'pipenv run python transform_patient_panel.py -db "{PRW_CONN}"',
+        command=f'pipenv run python transform_patient_panel.py -prw "{PRW_CONN}"',
         cwd=INGEST_CODE_ROOT,
     )
 

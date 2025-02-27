@@ -10,6 +10,7 @@ from sqlmodel import Session, select, inspect
 from prw_common.model import prw_model, prw_id_model
 from util import prw_id_utils, db_utils, util, prw_meta_utils
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
+from prw_common.cli_utils import cli_parser
 
 # Unique identifier for this ingest dataset
 DATASET_ID = "encounters"
@@ -17,13 +18,6 @@ DATASET_ID = "encounters"
 # -------------------------------------------------------
 # Config
 # -------------------------------------------------------
-# Default output to local SQLite DB.
-DEFAULT_PRW_CONN = "sqlite:///../prw.sqlite3"
-DEFAULT_PRW_ID_CONN = "sqlite:///../prw_id.sqlite3"
-
-# Input files
-DEFAULT_DATA_DIR = os.path.join("data", "encounters")
-
 # Logging configuration
 SHOW_SQL_IN_LOG = False
 logging.basicConfig(level=logging.INFO)
@@ -267,30 +261,18 @@ def partition_phi(patients_df: pd.DataFrame):
 # Main entry point
 # -------------------------------------------------------
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="Ingest source data into PRH warehouse."
+    parser = cli_parser(
+        description="Ingest source data into PRH warehouse.",
+        require_prw=True,
+        require_prwid=True,
+        require_in=True,
     )
-    parser.add_argument(
-        "-i",
-        "--input_dir",
-        help="Path to the source data directory. All .xlsx files in the directory will be read.",
-        default=DEFAULT_DATA_DIR,
-    )
-    parser.add_argument(
-        "-o",
-        "--out",
-        help='Output DB connection string, including credentials if needed. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=DEFAULT_PRW_CONN,
-    )
-    parser.add_argument(
-        "--id_out",
-        help="Output connection string for ID DB, or 'None' to skip",
-        default=DEFAULT_PRW_ID_CONN,
-    )
+    
+    # Add script-specific arguments
     parser.add_argument(
         "--drop",
-        action="store_true",
-        help="Drop and recreate all tables before ingesting data",
+        action="store_true", 
+        help="Drop and recreate all tables before ingesting data"
     )
     return parser.parse_args()
 
@@ -298,12 +280,12 @@ def parse_arguments():
 def main():
     # Load config from cmd line
     args = parse_arguments()
-    dir_path = args.input_dir
-    output_odbc = args.out
-    id_output_odbc = args.id_out if args.id_out.lower() != "none" else None
+    dir_path = args.input
+    output_conn = args.prw
+    id_output_conn = args.prwid if args.prwid.lower() != "none" else None
     drop_tables = args.drop
     logging.info(
-        f"Data dir: {dir_path}, output: {util.mask_pw(output_odbc)}, id output: {util.mask_pw(id_output_odbc or 'None')}"
+        f"Data dir: {dir_path}, output: {util.mask_pw(output_conn)}, id output: {util.mask_pw(id_output_conn or 'None')}"
     )
     logging.info(f"Drop tables before writing: {drop_tables}")
 
@@ -318,8 +300,8 @@ def main():
 
     # If ID DB is specified, read existing ID mappings
     prw_id_engine, mrn_to_prw_id_df = None, None
-    if id_output_odbc:
-        prw_id_engine = db_utils.get_db_connection(id_output_odbc, echo=SHOW_SQL_IN_LOG)
+    if id_output_conn:
+        prw_id_engine = db_utils.get_db_connection(id_output_conn, echo=SHOW_SQL_IN_LOG)
         if prw_id_engine is None:
             logging.error("ERROR: cannot open ID DB (see above). Terminating.")
             exit(1)
@@ -340,7 +322,7 @@ def main():
     patients_df, id_details_df = partition_phi(patients_df)
 
     # Get connection to output DBs
-    prw_engine = db_utils.get_db_connection(output_odbc, echo=SHOW_SQL_IN_LOG)
+    prw_engine = db_utils.get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
         logging.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)

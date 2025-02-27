@@ -6,15 +6,13 @@ from dataclasses import dataclass
 from sqlmodel import Session
 from util import util, db_utils, prw_meta_utils
 from prw_common.model.prw_panel_model import *
+from prw_common.cli_utils import cli_parser
 
 # -------------------------------------------------------
 # Config
 # -------------------------------------------------------
 # Unique identifier for this ingest dataset
 DATASET_ID = "patient_panel"
-
-# Default output to local SQLite DB.
-DEFAULT_PRW_CONN = "sqlite:///../prw.sqlite3"
 
 # Logging definitions
 logging.basicConfig(level=logging.INFO)
@@ -439,13 +437,9 @@ def keep_panel_data(src: SrcData) -> OutData:
 # Main entry point
 # -------------------------------------------------------
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="Recalculate patient panel data in-place in PRH warehouse."
-    )
-    parser.add_argument(
-        "-db",
-        help='DB connection string including credentials. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=DEFAULT_PRW_CONN,
+    parser = cli_parser(
+        description="Recalculate patient panel data in-place in PRH warehouse.",
+        require_prw=True,
     )
     return parser.parse_args()
 

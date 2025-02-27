@@ -9,18 +9,13 @@ from finance import sanity, parse, transform
 from util import util, db_utils, prw_meta_utils
 from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
 from prw_common.model.prw_finance_model import *
+from prw_common.cli_utils import cli_parser
 
 # -------------------------------------------------------
 # Config
 # -------------------------------------------------------
 # Unique identifier for this ingest dataset
 INGEST_DATASET_ID = "finance"
-
-# Default output to local SQLite DB.
-DEFAULT_PRW_CONN = "sqlite:///../prw.sqlite3"
-
-# Input files
-DEFAULT_DATA_DIR = os.path.join("data", "finance")
 
 # Opt into pandas 3 behavior for replace() and fillna(), where columns of object dtype are NOT changed to something more specific,
 # like int/float/str. This option can be removed once upgrading pandas 2-> 3.
@@ -68,21 +63,13 @@ def get_file_paths(base_path):
 # Main entry point
 # -------------------------------------------------------
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="Ingest finance data into PRH warehouse."
+    parser = cli_parser(
+        description="Ingest finance data into PRH warehouse.",
+        require_prw=True,
+        require_in=True,
     )
-    parser.add_argument(
-        "-i",
-        "--input_dir",
-        help="Path to the source data directory.",
-        default=DEFAULT_DATA_DIR,
-    )
-    parser.add_argument(
-        "-o",
-        "--out",
-        help='Output DB connection string, including credentials if needed. Look for Azure SQL connection string in Settings > Connection strings, eg. "mssql+pyodbc:///?odbc_connect=Driver={ODBC Driver 18 for SQL Server};Server=tcp:{your server name},1433;Database={your db name};Uid={your user};Pwd={your password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"',
-        default=DEFAULT_PRW_CONN,
-    )
+
+    # Add script-specific arguments
     parser.add_argument(
         "--drop",
         action="store_true",
@@ -94,11 +81,10 @@ def parse_arguments():
 def main():
     # Load config from cmd line
     args = parse_arguments()
-    base_path = args.input_dir
-    output_odbc = args.out
+    base_path = args.input
+    output_conn = args.prw
     drop_tables = args.drop
-
-    logging.info(f"Data dir: {base_path}, output: {util.mask_pw(output_odbc)}")
+    logging.info(f"Data dir: {base_path}, output: {util.mask_pw(output_conn)}")
     logging.info(f"Drop tables before writing: {drop_tables}")
 
     # Source file paths
@@ -151,7 +137,7 @@ def main():
     )
 
     # Get connection to output DBs
-    prw_engine = db_utils.get_db_connection(output_odbc, echo=SHOW_SQL_IN_LOG)
+    prw_engine = db_utils.get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
         logging.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)

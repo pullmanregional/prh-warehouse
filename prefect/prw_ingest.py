@@ -12,6 +12,7 @@ Datamart flows to execute are defined in the DATAMART_DEPLOYMENTS constant
 """
 
 import os
+import sys
 import pathlib
 import asyncio
 import argparse
@@ -21,18 +22,12 @@ from prefect.blocks.system import Secret
 from prefect.deployments import run_deployment
 from prefect_util import shell_op
 
-# Load env vars from a .env file
-# load_dotenv() does NOT overwrite existing env vars that are set before running this script.
-# Look for the .env file in this file's directory
-# Actual .env file (eg .env.dev) depends on value of PRW_ENV. Default to prod.
-PRW_ENV = os.getenv("PRW_ENV", "prod")
-ENV_FILES = {
-    "dev": ".env.dev",
-    "prod": ".env.prod",
-}
-ENV_PATH = os.path.join(os.path.dirname(__file__), ENV_FILES.get(PRW_ENV))
-print(f"Using environment: {ENV_PATH}")
-load_dotenv(dotenv_path=ENV_PATH)
+# Import from prw_common, which requires that we add the parent dir to the path
+sys.path.append("..")
+from ingest.prw_common.env_utils import load_prw_env
+
+# Load env vars from the .env file corresponding to PRW_ENV (dev/prod)
+PRW_ENV = load_prw_env(__file__)
 
 # Update path to include pipenv in the worker user's local bin
 os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin"

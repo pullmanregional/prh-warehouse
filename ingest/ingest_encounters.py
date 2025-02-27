@@ -1,6 +1,5 @@
 import os
 import logging
-import argparse
 import warnings
 import pandas as pd
 from typing import List
@@ -275,7 +274,6 @@ def parse_arguments():
         help="Drop and recreate all tables before ingesting data"
     )
     return parser.parse_args()
-
 
 def main():
     # Load config from cmd line

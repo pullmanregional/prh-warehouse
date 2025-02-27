@@ -447,9 +447,9 @@ def parse_arguments():
 def main():
     # Load config from cmd line
     args = parse_arguments()
-    db_url = args.db
+    db_url = args.prw
 
-    logging.info(f"DB: {util.mask_pw(db_url)}")
+    logging.info(f"Using PRW DB: {util.mask_pw(db_url)}")
 
     # Get connection to DB
     prw_engine = db_utils.get_db_connection(db_url, echo=SHOW_SQL_IN_LOG)

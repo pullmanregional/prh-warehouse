@@ -1,9 +1,7 @@
 import os
 import logging
-import argparse
 import pandas as pd
 from datetime import datetime
-from dotenv import load_dotenv
 from sqlmodel import Session
 from finance import sanity, parse, transform
 from util import util, db_utils, prw_meta_utils

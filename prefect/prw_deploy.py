@@ -30,11 +30,37 @@ if __name__ == "__main__":
     # Datamart flows
     # These flows are triggered by name by prw_ingest.py
     # ------------------------------------------------------------------
+    # Finance dashboard
     flow.from_source(
         source="https://github.com/jonjlee-streamlit/prh-dash.git",
         entrypoint="prefect/flow.py:prh_datamart_finance",
     ).deploy(
         name="prw-datamart-finance",
+        work_pool_name="ingest",
+    )
+
+    # SQL reports
+    prw_exporter_repo = GitRepository(
+        url="https://github.com/pullmanregional/prw-exporter.git",
+        credentials=GitHubCredentials.load("github-prh-ro"),
+        include_submodules=True,
+    )
+    flow.from_source(
+        source=prw_exporter_repo,
+        entrypoint="reports/prefect/flow.py:prh_reports",
+    ).deploy(
+        name="prh-reports",
+        work_pool_name="ingest",
+    )
+
+    # ------------------------------------------------------------------
+    # Source data extraction flows
+    # ------------------------------------------------------------------
+    flow.from_source(
+        source=prw_exporter_repo,
+        entrypoint="sources/epic/prefect/flow.py:prh_sources_epic",
+    ).deploy(
+        name="prh-sources-epic",
         work_pool_name="ingest",
     )
 

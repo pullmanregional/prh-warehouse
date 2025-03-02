@@ -25,18 +25,14 @@ logging.basicConfig(level=logging.INFO)
 # -------------------------------------------------------
 # Extract from Source Files
 # -------------------------------------------------------
-def sanity_check_data_dir(base_path, encounters_files):
+def sanity_check_data_file(csv_file):
     """
-    Executed once at the beginning of ingest to validate data directory and files
-    meet basic requirements.
+    Executed once at the beginning of ingest to validate CSV file
+    meets basic requirements.
     """
     error = None
-    if not os.path.isdir(base_path):
-        error = f"ERROR: data directory path does not exist: {base_path}"
-
-    for encounters_file in encounters_files:
-        if not os.path.isfile(encounters_file):
-            error = f"ERROR: data file missing: {encounters_file}"
+    if not os.path.isfile(csv_file):
+        error = f"ERROR: input file does not exist: {csv_file}"
 
     if error is not None:
         print(error)
@@ -55,46 +51,61 @@ def read_mrn_to_prw_id_table(engine):
         return pd.DataFrame(results, columns=["prw_id", "mrn"])
 
 
-def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
+def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     # -------------------------------------------------------
-    # Extract data from first sheet from excel worksheet
+    # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {files}")
-    df = pd.DataFrame()
-    for file in files:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            part = pd.read_excel(file, sheet_name=0, usecols="A:V", header=0)
-
-        df = pd.concat([df, part])
-
-    # Rename columns to match the required column names
-    df.rename(
-        columns={
-            "MRN": "mrn",
-            "Patient": "name",
-            "Sex": "sex",
-            "DOB": "dob",
-            "Address": "address",
-            "City": "city",
-            "State": "state",
-            "ZIP": "zip",
-            "Phone": "phone",
-            "Pt. E-mail Address": "email",
-            "PCP": "pcp",
-            "Location": "location",
-            "Dept": "dept",
-            "Visit Date": "encounter_date",
-            "Time": "encounter_time",
-            "Encounter Type": "UNUSED",
-            "Type": "encounter_type",
-            "Provider/Resource": "service_provider",
-            "With PCP?": "with_pcp",
-            "Appt Status": "appt_status",
-            "Encounter Diagnoses": "diagnoses",
-            "Level of Service": "level_of_service",
+    logging.info(f"Reading {csv_file}")
+    df = pd.read_csv(
+        csv_file,
+        skiprows=1,
+        names=[
+            "mrn",
+            "name",
+            "sex",
+            "dob",
+            "address",
+            "city",
+            "state",
+            "zip",
+            "phone",
+            "email",
+            "pcp",
+            "dept",
+            "encounter_date",
+            "encounter_time",
+            "encounter_type",
+            "service_provider",
+            "with_pcp",
+            "appt_status",
+            "diagnoses",
+            "level_of_service",
+            "level_of_service_name",
+        ],
+        dtype={
+            "mrn": str,
+            "name": str, 
+            "sex": str,
+            "dob": str,
+            "address": str,
+            "city": str,
+            "state": str,
+            "zip": str,
+            "phone": str,
+            "email": str,
+            "pcp": str,
+            "dept": str,
+            "encounter_date": str,
+            "encounter_time": str,
+            "encounter_type": str,
+            "service_provider": str,
+            "with_pcp": "Int8",
+            "appt_status": str,
+            "diagnoses": str,
+            "level_of_service": str,
+            "level_of_service_name": str
         },
-        inplace=True,
+        index_col=False,
     )
 
     # Retain columns needed for tranform and load
@@ -116,7 +127,6 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     encounters_df = df[
         [
             "mrn",
-            "location",
             "dept",
             "encounter_date",
             "encounter_time",
@@ -135,11 +145,18 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
     # Convert MRN to string
     patients_df["mrn"] = patients_df["mrn"].astype(str)
     encounters_df["mrn"] = encounters_df["mrn"].astype(str)
+
+    # Convert with_pcp to boolean (CSV might have 0/1 instead of True/False)
     encounters_df["with_pcp"] = encounters_df["with_pcp"].astype(bool)
 
-    # Force encounter_date to be date only, no time
+    # Handle date/time formats
+    # BirthDate column is in YYYY-MM-DD format
+    patients_df["dob"] = pd.to_datetime(patients_df["dob"])
+
+    # AppointmentDateKey is in YYYYMMDD format (e.g., 20240301)
+    # AppointmentTimeOfDayKey is in HHMM 24-hour format (e.g., 1400)
     encounters_df["encounter_date"] = pd.to_datetime(
-        encounters_df["encounter_date"]
+        encounters_df["encounter_date"].astype(str), format="%Y%m%d"
     ).dt.date
 
     # -------------------------------------------------------
@@ -167,16 +184,6 @@ def read_encounters(files: List[str], mrn_to_prw_id_df: pd.DataFrame = None):
 # -------------------------------------------------------
 # Transform
 # -------------------------------------------------------
-ME_PROVIDER = "Jonathan Lee, MD"
-
-
-def map_me_provider(patients_df: pd.DataFrame):
-    patients_df["pcp"] = patients_df["pcp"].apply(
-        lambda provider: ME_PROVIDER if provider == "Me" else provider
-    )
-    return patients_df
-
-
 def calc_patient_age(patients_df: pd.DataFrame):
     """
     Calculate age and age_in_mo_under_3 from dob
@@ -188,9 +195,11 @@ def calc_patient_age(patients_df: pd.DataFrame):
         lambda dob: relativedelta(now, dob).years
     )
     patients_df["age_in_mo_under_3"] = patients_df["dob"].apply(
-        lambda dob: relativedelta(now, dob).years * 12 + relativedelta(now, dob).months
-        if relativedelta(now, dob).years <= 2
-        else None
+        lambda dob: (
+            relativedelta(now, dob).years * 12 + relativedelta(now, dob).months
+            if relativedelta(now, dob).years <= 2
+            else None
+        )
     )
     # Convert to integer type
     patients_df["age_in_mo_under_3"] = patients_df["age_in_mo_under_3"].astype("Int64")
@@ -224,7 +233,9 @@ def calc_age_at_encounter(encounters_df: pd.DataFrame, patients_df: pd.DataFrame
         axis=1,
     )
     # Convert to integer type
-    encounters_df["encounter_age_in_mo_under_3"] = encounters_df["encounter_age_in_mo_under_3"].astype("Int64")
+    encounters_df["encounter_age_in_mo_under_3"] = encounters_df[
+        "encounter_age_in_mo_under_3"
+    ].astype("Int64")
     encounters_df.drop(columns=["dob"], inplace=True)
 
     return encounters_df
@@ -266,34 +277,31 @@ def parse_arguments():
         require_prwid=True,
         require_in=True,
     )
-    
+
     # Add script-specific arguments
     parser.add_argument(
         "--drop",
-        action="store_true", 
-        help="Drop and recreate all tables before ingesting data"
+        action="store_true",
+        help="Drop and recreate all tables before ingesting data",
     )
     return parser.parse_args()
+
 
 def main():
     # Load config from cmd line
     args = parse_arguments()
-    dir_path = args.input
+    in_file = args.input
     output_conn = args.prw
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
     drop_tables = args.drop
     logging.info(
-        f"Data dir: {dir_path}, output: {util.mask_pw(output_conn)}, id output: {util.mask_pw(id_output_conn or 'None')}"
+        f"Input: {in_file}, output: {util.mask_pw(output_conn)}, id output: {util.mask_pw(id_output_conn or 'None')}"
     )
     logging.info(f"Drop tables before writing: {drop_tables}")
 
-    # Source file paths
-    encounters_files = util.get_excel_files(dir_path)
-    logging.info(f"Source files: {encounters_files}")
-
-    # Sanity check data directory expected location and files
-    if not sanity_check_data_dir(dir_path, encounters_files):
-        logging.error("ERROR: data directory error (see above). Terminating.")
+    # Sanity check the input file
+    if not sanity_check_data_file(in_file):
+        logging.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
     # If ID DB is specified, read existing ID mappings
@@ -309,9 +317,8 @@ def main():
         else:
             logging.info("ID DB table does not exist, will generate new ID mappings")
 
-    # Read source files into memory
-    patients_df, encounters_df = read_encounters(encounters_files, mrn_to_prw_id_df)
-    patients_df = map_me_provider(patients_df)
+    # Read source file into memory
+    patients_df, encounters_df = read_encounters(in_file, mrn_to_prw_id_df)
 
     # Transform data only to partition PHI into separate DB. All other data
     # transformations should be done by later flows in the pipeline.
@@ -348,10 +355,7 @@ def main():
     )
 
     # Update last ingest time and modified times for source data files
-    modified = {
-        file: datetime.fromtimestamp(os.path.getmtime(file))
-        for file in encounters_files
-    }
+    modified = {in_file: datetime.fromtimestamp(os.path.getmtime(in_file))}
     prw_meta_utils.write_meta(prw_session, DATASET_ID, modified)
 
     # Cleanup

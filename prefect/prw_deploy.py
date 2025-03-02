@@ -61,6 +61,7 @@ if __name__ == "__main__":
         entrypoint="sources/epic/prefect/flow.py:prh_sources_epic",
     ).deploy(
         name="prh-sources-epic",
+        cron="0 2 * * *",  # At 2:00 AM every day
         work_pool_name="ingest",
     )
 

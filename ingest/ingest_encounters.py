@@ -158,6 +158,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     encounters_df["encounter_date"] = pd.to_datetime(
         encounters_df["encounter_date"].astype(str), format="%Y%m%d"
     ).dt.date
+    encounters_df["encounter_time"] = encounters_df["encounter_time"].astype(str).str.zfill(4)
 
     # -------------------------------------------------------
     # Add prw_id to patients and encounters

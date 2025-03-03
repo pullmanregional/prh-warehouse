@@ -50,89 +50,70 @@ def read_source_tables(session: Session) -> SrcData:
 # Transform
 # -------------------------------------------------------
 PROVIDER_TO_LOCATION = {
-    "Sangha, Dildeep": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Olawuyi, Damola Bolutife": "CC WPL FM RESIDENCY CLINIC",
-    "Davis, Jennifer": "CC WPL PALOUSE HEALTH CENTER",
-    "Boyd, Jeana M": "CC WPL PULLMAN FAMILY MEDICINE",
-    "White, Malia": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Hatley, Shannon M": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Adkins, Benjamin J": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Guida, Kimberley": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Ward, Jeffrey Loren": "CC WPL FM RESIDENCY CLINIC",
-    "Harris, Brenna R": "CC WPL FM RESIDENCY CLINIC",
-    "Brodsky, Kaz B": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Smith, Angeline Elizabeth": "CC WPL PALOUSE HEALTH CENTER",
-    "Cargill, Teresa": "CC WPL PULLMAN FAMILY MEDICINE",
-    "Thompson, Molly": "CC WPL FM RESIDENCY CLINIC",
-    "Perin, Karly": "CC WPL FM RESIDENCY CLINIC",
-    "Younes, Mohammed": "CC WPL FM RESIDENCY CLINIC",
-    "Mader, Kelsey": "CC WPL FM RESIDENCY CLINIC",
-    "Shakir, Tuarum N": "CC WPL FM RESIDENCY CLINIC",
-    "Frostad, Michael": "CC WPL PALOUSE PEDIATRICS MOSCOW",
-    "Hryniewicz, Kathryn": "CC WPL PALOUSE PEDIATRICS MOSCOW",
-    "Rinaldi, Mackenzie Claire": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Shields, Maricarmen": "CC WPL PALOUSE PEDIATRICS MOSCOW",
-    "Lee, Jonathan": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Gordon, Methuel": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Manderville, Tracy": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "Clinic, Pullman Fam Med Residency": "CC WPL FM RESIDENCY CLINIC",
+    "ADKINS, BENJAMIN J": "CC WPL PULLMAN FAMILY MEDICINE",
+    "AIYENOWO, JOSEPH O": "CC WPL PALOUSE MED PRIMARY CARE", 
+    "BRODSKY, KAZ B": "CC WPL PULLMAN FAMILY MEDICINE",
+    "BURKE, MORGAN ELIZABETH": "CC WPL PALOUSE MED PRIMARY CARE",
+    "CARGILL, TERESA": "CC WPL PULLMAN FAMILY MEDICINE",
+    "DAVIS, JENNIFER": "CC WPL PULLMAN FAMILY MEDICINE",
+    "FOSBACK, STEPHANIE M": "CC WPL PALOUSE MED PRIMARY CARE",
+    "FROSTAD, MICHAEL": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "GARCIA, CLARA E": "CC WPL PALOUSE MED PRIMARY CARE",
+    "GORDON, METHUEL": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "GREGORY, NANCY": "CC WPL PALOUSE MED PRIMARY CARE",
+    "GUIDA, KIMBERLEY": "CC WPL PULLMAN FAMILY MEDICINE",
+    "HALL, STEPHEN": "CC WPL PALOUSE MED PRIMARY CARE",
+    "HARRIS, BRENNA R": "CC WPL FM RESIDENCY CLINIC",
+    "HATLEY, SHANNON M": "CC WPL PULLMAN FAMILY MEDICINE",
+    "HOOVER, MARK A": "CC WPL PALOUSE MED PRIMARY CARE",
+    "HOWELL, RICHARD L": "CC WPL PALOUSE MED PRIMARY CARE",
+    "HRYNIEWICZ, KATHRYN": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "IACOBELLI, CHRISTOPHER J": "CC WPL PALOUSE MED PRIMARY CARE",
+    "LEE, JONATHAN": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "LEE, JONATHAN J": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "LEIDER, MORGAN": "CC WPL PALOUSE MED PRIMARY CARE",
+    "MADER, KELSEY": "CC WPL FM RESIDENCY CLINIC",
+    "OLAWUYI, DAMOLA BOLUTIFE": "CC WPL FM RESIDENCY CLINIC",
+    "PERIN, KARLY": "CC WPL FM RESIDENCY CLINIC",
+    "RINALDI, MACKENZIE CLAIRE": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "SANGHA, DILDEEP": "CC WPL PULLMAN FAMILY MEDICINE",
+    "SHAKIR, TUARUM N": "CC WPL FM RESIDENCY CLINIC",
+    "SHIELDS, MARICARMEN": "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "SHONK, JENNIFER L": "CC WPL FM RESIDENCY CLINIC",
+    "SMITH, ANGELINE ELIZABETH": "CC WPL PULLMAN FAMILY MEDICINE",
+    "STANCIL, LAKEESHA": "CC WPL PULLMAN FAMILY MEDICINE",
+    "THOMPSON, MOLLY": "CC WPL FM RESIDENCY CLINIC",
+    "TRICOLA, KASSANDRA M": "CC WPL PALOUSE MED PRIMARY CARE",
+    "WARD, JEFFREY LOREN": "CC WPL FM RESIDENCY CLINIC",
+    "WEBB, DRUE": "CC WPL PULLMAN FAMILY MEDICINE",
+    "WEBBER, MOLLY": "CC WPL FM RESIDENCY CLINIC",
+    "WHITE, MALIA": "CC WPL PULLMAN FAMILY MEDICINE",
+    "YOUNES, MOHAMMED": "CC WPL FM RESIDENCY CLINIC",
 }
 WELL_ENCOUNTER_TYPES = [
+    "CC WELL BABY",
+    "CC WELL CHILD",
+    "CC WELLNESS",
+    "CC MEDICARE ANNUAL WELLNESS",
     "CC PHYSICAL",
-    "CC SPORTS",
-    "CC WELL CH",
-    "CC WELL CH",
-    "CCWELLBABY",
-    "MEDICARE WEL",
-    "NEWOB",
-    "SUB AN WELL",
-    "Well Women",
-    "WELLNESS",
+    "CC WELL WOMEN",
+    "CC DOT PHYSICAL",
+    "CC MEDICARE SUB AN WELL",
+    "CC SPORTS PHYSICAL",
+    "CC FAA PHYSICAL",
 ]
-WELL_ENCOUNTER_CODES = [
-    "V20.2",  # Health check > 28d, well adol
-    "V20.31",  # Newborn
-    "V20.32",  # Newborn
-    "V70.0",  # Prev health care
-    "1062090",  # Enc for well child, abnl
-    "1447670",  # Enc for well child at age
-    "1447671",  # Enc for well child at age
-    "1447672",  # Enc for well child at age
-    "1447673",  # Enc for well child at age
-    "1447674",  # Enc for well child at age
-    "1447675",  # Enc for well child at age
-    "1447676",  # Enc for well child at age
-    "1447677",  # Enc for well child at age
-    "1447678",  # Enc for well child at age
-    "1447679",  # Enc for well child at age
-    "1447680",  # Enc for well child at age
-    "1513399",  # Enc for well child, no abnl
-    "1513777",  # Enc for well child, no abnl
-    "1514624",  # Enc for well child, no abnl
-    "1514636",  # Enc for well child, no abnl
-    "1514654",  # Enc for well child, no abnl
-    "1564543",  # Enc for well child at age
-    "1564546",  # Enc for well child at age
-    "1564547",  # Enc for well child at age
-    "1564548",  # Enc for well child at age
-    "1564567",  # Enc for well child at age
-    "1666233",  # Enc for prev health
-    "1665397",  # Enc for well child at age
-    "1665398",  # Enc for well child at age
-    "1665399",  # Enc for well child at age
-    "1665402",  # Enc for well child at age
-    "1665403",  # Enc for well child at age
-    "1665404",  # Enc for well child at age
-    "1665405",  # Enc for well child at age
-    "1665406",  # Enc for well child at age
-    "1665407",  # Enc for well child at age
-    "1678386",  # Enc for well child at age
-    "1691453",  # Enc for well child at age
-    "1719267",  # Enc for well child at age
-    "1719268",  # Enc for well child at age
-    "1719269",  # Enc for well child at age
+WELL_DX_STRINGS = [
+    "well baby",
+    "well child",
+    "well adolescent",
+    "well woman",
+    "well man",
+    "wellness visit",
+    "annual wellness",
+    "well exam",
+    "wellness exam",
 ]
-WELL_ENCOUNTER_CODES_REGEX = "|".join(f"[{code}]" for code in WELL_ENCOUNTER_CODES)
+WELL_DX_REGEX = "|".join(f"[{code}]" for code in WELL_DX_STRINGS)
 
 
 def transform_add_peds_panels(src: SrcData):
@@ -155,15 +136,15 @@ def transform_add_peds_panels(src: SrcData):
     three_years_ago = pd.Timestamp.now() - pd.DateOffset(years=3)
     encounters_df = encounters_df[encounters_df["encounter_date"] >= three_years_ago]
 
-    # Mark encounters in the dept in CCWPL PEDPUL or CCWPL PEDMOS
-    encounters_df["is_peds_encounter"] = (encounters_df["dept"] == "CCWPL PEDPUL") | (
-        encounters_df["dept"] == "CCWPL PEDMOS"
+    # Mark encounters in the dept in CC WPL PALOUSE PEDIATRICS PULLMAN or CC WPL PALOUSE PEDIATRICS MOSCOW
+    encounters_df["is_peds_encounter"] = (encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS PULLMAN") | (
+        encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS MOSCOW"
     )
 
     # Mark well visits by visit type or diagnoses
     encounters_df["is_well_visit"] = encounters_df["encounter_type"].isin(
         WELL_ENCOUNTER_TYPES
-    ) | encounters_df["diagnoses"].str.match(WELL_ENCOUNTER_CODES_REGEX)
+    ) | encounters_df["diagnoses"].str.match(WELL_DX_REGEX, case=False)
 
     # ------------------------------------------------
     # Empanel by location:
@@ -366,7 +347,9 @@ def transform_add_other_panels(src: SrcData):
         recent_encounters["prw_id"].isin(patients_after_2nd_cut["prw_id"])
         & (
             recent_encounters["encounter_type"].isin(WELL_ENCOUNTER_TYPES)
-            | recent_encounters["diagnoses"].str.match(WELL_ENCOUNTER_CODES_REGEX)
+            | recent_encounters["diagnoses"].str.match(
+                WELL_DX_REGEX, case=False
+            )
         )
     ].sort_values("encounter_date", ascending=False)
 

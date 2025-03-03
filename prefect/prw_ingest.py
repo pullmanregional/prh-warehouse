@@ -29,11 +29,11 @@ from ingest.prw_common.env_utils import load_prw_env
 # Load env vars from the .env file corresponding to PRW_ENV (dev/prod)
 PRW_ENV = load_prw_env(__file__)
 
-# Update path to include pipenv in the worker user's local bin
-os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin"
+# Update path to include pipenv in the worker user's local bin or .pyenv shims
+os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.pyenv/shims/"
 
 # Load config from env vars into constants
-PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
+PRW_ENCOUNTERS_SOURCE = os.environ.get("PRW_ENCOUNTERS_SOURCE")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
 PRW_CONN = os.environ.get("PRW_CONN") or Secret.load("prw-db-url").get()
 PRW_ID_CONN = os.environ.get("PRW_ID_CONN") or Secret.load("prw-id-db-url").get()
@@ -55,7 +55,7 @@ DATAMART_DEPLOYMENTS = [
 @flow
 async def prw_ingest_encounters(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -prw "{PRW_CONN}" -prwid "{PRW_ID_CONN}" {drop_flag}'
+    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE}" -prw "{PRW_CONN}" -prwid "{PRW_ID_CONN}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -75,14 +75,6 @@ async def prw_ingest_finance(drop_tables=False):
 # -----------------------------------------
 # Additional transforms to source data
 # -----------------------------------------
-@flow
-async def prw_transform_clean_encounters():
-    return await shell_op(
-        command=f'pipenv run python transform_clean_encounters.py -prw "{PRW_CONN}"',
-        cwd=INGEST_CODE_ROOT,
-    )
-
-
 @flow
 async def prw_transform_patient_panel():
     return await shell_op(
@@ -115,7 +107,7 @@ async def prw_ingest(
     # The PIPENV_IGNORE_VIRTUALENVS env var instructs pipenv to install dependencies from the Pipfile 
     # in the current directory (../ingest) into the current venv (prefect-prh-warehouse).
     await shell_op(
-        command="pipenv install",
+        command="env; pipenv install",
         env={"PIPENV_IGNORE_VIRTUALENVS": "1"},
         cwd=INGEST_CODE_ROOT
     )
@@ -129,9 +121,6 @@ async def prw_ingest(
         await asyncio.gather(*ingest_flows)
 
     if run_transform:
-        # Clean data
-        await prw_transform_clean_encounters()
-
         # After ingest flows are complete, run transform flows, which calculate
         # additional common columns that will be used across multiple applications
         transform_flows = [prw_transform_patient_panel()]

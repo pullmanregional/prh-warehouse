@@ -116,6 +116,12 @@ WELL_DX_STRINGS = [
 WELL_DX_REGEX = "|".join(f"[{code}]" for code in WELL_DX_STRINGS)
 
 
+def transform_filter_completed_encounters(src: SrcData):
+    """
+    Only look at encounters that were completed to calculate panel info
+    """
+    src.encounters_df = src.encounters_df[src.encounters_df["appt_status"] == "Completed"]
+
 def transform_add_peds_panels(src: SrcData):
     """
     Add panel data (panel_location, panel_provider) to patients_df in place
@@ -243,16 +249,23 @@ def transform_add_peds_panels(src: SrcData):
 
     # Apply rules to each patient
     empaneled_patients = []
-    for prw_id in patients_df["prw_id"]:
+    for i, prw_id in enumerate(patients_df["prw_id"]):
         if meets_rule_1(prw_id) or meets_rule_2(prw_id) or meets_rule_3(prw_id):
             if not should_remove_by_rule_4(prw_id):
                 empaneled_patients.append(prw_id)
+        if (i + 1) % 1000 == 0:
+            logging.info(f"{i + 1} / {len(patients_df)} patients...")
 
     # Update panel_location for empaneled patients
     mask = src.patients_df["prw_id"].isin(empaneled_patients)
     src.patients_df.loc[mask, "panel_location"] = "Palouse Pediatrics"
 
     logging.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
+    print(
+        "\nData Sample:\n-----------------------------------------------------------------------------------\n",
+        src.patients_df[src.patients_df["panel_location"].notna()][["prw_id", "panel_location", "panel_provider"]].head(),
+        "\n-----------------------------------------------------------------------------------\n",
+    )
 
 
 def transform_add_other_panels(src: SrcData):
@@ -271,13 +284,14 @@ def transform_add_other_panels(src: SrcData):
     logging.info("Adding panel information")
     patients_df, encounters_df = src.patients_df, src.encounters_df
 
-    # Filter out patients that already have a panel provider or location
+    # Filter out patients and encounters that already have a panel provider or location
     patients_df = patients_df[
         (patients_df["panel_provider"].isna()) & (patients_df["panel_location"].isna())
     ]
+    encounters_df = encounters_df[encounters_df["prw_id"].isin(patients_df["prw_id"])]
 
     # Initialize panel columns
-    logging.info(f"Number of patients: {len(patients_df)}")
+    logging.info(f"Number of unassigned patients: {len(patients_df)}")
 
     # Filter to encounters in the past 2 years
     two_years_ago = pd.Timestamp.now() - pd.DateOffset(years=2)
@@ -447,8 +461,8 @@ def main():
     if "panel_location" not in src.patients_df.columns:
         src.patients_df["panel_location"] = pd.NA
 
-
     # Transform data
+    transform_filter_completed_encounters(src)
     transform_add_peds_panels(src)
     transform_add_other_panels(src)
     out = keep_panel_data(src)

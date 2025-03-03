@@ -124,10 +124,6 @@ def transform_add_peds_panels(src: SrcData):
     patients_df, encounters_df = src.patients_df, src.encounters_df
 
     # Filter out patients that already have a panel provider or location
-    if "panel_provider" not in patients_df.columns:
-        patients_df["panel_provider"] = pd.NA
-    if "panel_location" not in patients_df.columns:
-        patients_df["panel_location"] = pd.NA
     patients_df = patients_df[
         (patients_df["panel_provider"].isna()) & (patients_df["panel_location"].isna())
     ]
@@ -253,8 +249,8 @@ def transform_add_peds_panels(src: SrcData):
                 empaneled_patients.append(prw_id)
 
     # Update panel_location for empaneled patients
-    mask = patients_df["prw_id"].isin(empaneled_patients)
-    patients_df.loc[mask, "panel_location"] = "Palouse Pediatrics"
+    mask = src.patients_df["prw_id"].isin(empaneled_patients)
+    src.patients_df.loc[mask, "panel_location"] = "Palouse Pediatrics"
 
     logging.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
 
@@ -388,19 +384,19 @@ def transform_add_other_panels(src: SrcData):
     )
 
     # Merge all_assignments back into patients_df
-    all_assignments = patients_df.merge(
+    all_assignments = src.patients_df.merge(
         all_assignments, on="prw_id", how="left", suffixes=("", "_new")
     )
-    patients_df["panel_provider"] = all_assignments["service_provider"]
+    src.patients_df["panel_provider"] = all_assignments["service_provider"]
 
     # Map providers to locations
-    patients_df["panel_location"] = patients_df["panel_provider"].map(
+    src.patients_df["panel_location"] = src.patients_df["panel_provider"].map(
         PROVIDER_TO_LOCATION
     )
 
     print(
         "\nData Sample:\n-----------------------------------------------------------------------------------\n",
-        patients_df[["prw_id", "panel_location", "panel_provider"]].head(),
+        src.patients_df[["prw_id", "panel_location", "panel_provider"]].head(),
         "\n-----------------------------------------------------------------------------------\n",
     )
 
@@ -444,6 +440,13 @@ def main():
     src = read_source_tables(prw_session)
     if src is None:
         util.error_exit("ERROR: failed to read source data (see above)")
+
+    # Add panel columns
+    if "panel_provider" not in src.patients_df.columns:
+        src.patients_df["panel_provider"] = pd.NA
+    if "panel_location" not in src.patients_df.columns:
+        src.patients_df["panel_location"] = pd.NA
+
 
     # Transform data
     transform_add_peds_panels(src)

@@ -20,9 +20,15 @@ class TableData:
 # -------------------------------------------------------
 # DB Utilities
 # -------------------------------------------------------
-def get_db_connection(odbc_str: str, echo: bool = False) -> sqlalchemy.Engine:
+def get_db_connection(odbc_str: str, echo: bool = False, max_retries: int = 3, retry_delay: int = 5) -> sqlalchemy.Engine:
     """
     Given an ODBC connection string, return a connection to the DB via SQLModel
+    
+    Args:
+        odbc_str: ODBC connection string
+        echo: Whether to echo SQL statements
+        max_retries: Maximum number of connection retry attempts
+        retry_delay: Delay in seconds between retry attempts
     """
     # Split connection string into odbc prefix and parameters (ie everything after odbc_connect=)
     match = re.search(r"^(.*odbc_connect=)(.*)$", odbc_str)
@@ -35,18 +41,24 @@ def get_db_connection(odbc_str: str, echo: bool = False) -> sqlalchemy.Engine:
         # No odbc_connect= found, just original string
         conn_str = odbc_str
 
-    # Use SQLModel to establish connection to DB
-    try:
-        if conn_str.startswith('mssql'):
-            # Optimize with fast_executemany, which is supported by MSSQL / Azure SQL
-            engine = create_engine(conn_str, echo=echo, fast_executemany=True)
-        else:
-            engine = create_engine(conn_str, echo=echo)
-        return engine
-    except Exception as e:
-        logging.error(f"ERROR: failed to connect to DB")
-        logging.error(e)
-        return None
+    # Use SQLModel to establish connection to DB with retries
+    retries = 0
+    while retries < max_retries:
+        try:
+            if conn_str.startswith('mssql'):
+                # Optimize with fast_executemany, which is supported by MSSQL / Azure SQL
+                engine = create_engine(conn_str, echo=echo, fast_executemany=True)
+            else:
+                engine = create_engine(conn_str, echo=echo)
+            return engine
+        except Exception as e:
+            retries += 1
+            if retries == max_retries:
+                logging.error(f"ERROR: failed to connect to DB after {max_retries} attempts")
+                logging.error(e)
+                return None
+            logging.warning(f"Connection attempt {retries} failed, retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
 
 
 def clear_tables(session: Session, tables: List[SQLModel]):

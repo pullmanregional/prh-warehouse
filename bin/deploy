@@ -1,0 +1,3 @@
+#!/bin/bash
+cd prefect
+pipenv run prefect profile use ephemeral && pipenv run python prw_deploy.py

@@ -6,15 +6,6 @@ import logging
 # -------------------------------------------------------
 # Utilities
 # -------------------------------------------------------
-def mask_pw(odbc_str):
-    """
-    Mask uid and pwd in ODBC connection string for logging
-    """
-    # Use regex to mask uid= and pwd= values
-    masked_str = re.sub(r"(uid=|pwd=)[^;]*", r"\1****", odbc_str, flags=re.IGNORECASE)
-    return masked_str
-
-
 def get_excel_files(dir_path):
     """
     Returns a list of Excel files in a given directory. Does not recurse.

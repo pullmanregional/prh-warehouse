@@ -4,10 +4,10 @@ import pandas as pd
 from datetime import datetime
 from sqlmodel import Session
 from finance import sanity, parse, transform
-from util import util, db_utils, prw_meta_utils
-from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
+from util import util, prw_meta_utils
 from prw_common.model.prw_finance_model import *
 from prw_common.cli_utils import cli_parser
+from prw_common.db_utils import TableData, get_db_connection, mask_conn_pw, clear_tables_and_insert_data
 
 # -------------------------------------------------------
 # Config
@@ -82,7 +82,7 @@ def main():
     base_path = args.input
     output_conn = args.prw
     drop_tables = args.drop
-    logging.info(f"Data dir: {base_path}, output: {util.mask_pw(output_conn)}")
+    logging.info(f"Data dir: {base_path}, output: {mask_conn_pw(output_conn)}")
     logging.info(f"Drop tables before writing: {drop_tables}")
 
     # Source file paths
@@ -135,7 +135,7 @@ def main():
     )
 
     # Get connection to output DBs
-    prw_engine = db_utils.get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
+    prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
         logging.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)

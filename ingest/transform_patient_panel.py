@@ -1,13 +1,12 @@
 import os
 import logging
-import argparse
 import pandas as pd
 from dataclasses import dataclass
 from sqlmodel import Session
-from util import util, db_utils, prw_meta_utils
+from util import util, prw_meta_utils
 from prw_common.model.prw_panel_model import *
 from prw_common.cli_utils import cli_parser
-
+from prw_common.db_utils import TableData, get_db_connection, mask_conn_pw, clear_tables_and_insert_data
 # -------------------------------------------------------
 # Config
 # -------------------------------------------------------
@@ -452,10 +451,10 @@ def main():
     args = parse_arguments()
     db_url = args.prw
 
-    logging.info(f"Using PRW DB: {util.mask_pw(db_url)}")
+    logging.info(f"Using PRW DB: {mask_conn_pw(db_url)}")
 
     # Get connection to DB
-    prw_engine = db_utils.get_db_connection(db_url, echo=SHOW_SQL_IN_LOG)
+    prw_engine = get_db_connection(db_url, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
         util.error_exit("ERROR: cannot open output DB (see above). Terminating.")
     prw_session = Session(prw_engine)
@@ -483,10 +482,10 @@ def main():
     PrwPatientPanel.metadata.create_all(prw_engine)
 
     # Write into DB
-    db_utils.clear_tables_and_insert_data(
+    clear_tables_and_insert_data(
         prw_session,
         [
-            db_utils.TableData(table=PrwPatientPanel, df=out.patients_panels_df),
+            TableData(table=PrwPatientPanel, df=out.patients_panels_df),
         ],
     )
 

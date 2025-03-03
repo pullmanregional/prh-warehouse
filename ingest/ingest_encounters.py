@@ -7,9 +7,9 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from sqlmodel import Session, select, inspect
 from prw_common.model import prw_model, prw_id_model
-from util import prw_id_utils, db_utils, util, prw_meta_utils
-from util.db_utils import TableData, clear_tables, clear_tables_and_insert_data
+from util import prw_id_utils, prw_meta_utils
 from prw_common.cli_utils import cli_parser
+from prw_common.db_utils import TableData, get_db_connection, mask_conn_pw, clear_tables_and_insert_data
 
 # Unique identifier for this ingest dataset
 DATASET_ID = "encounters"
@@ -296,7 +296,7 @@ def main():
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
     drop_tables = args.drop
     logging.info(
-        f"Input: {in_file}, output: {util.mask_pw(output_conn)}, id output: {util.mask_pw(id_output_conn or 'None')}"
+        f"Input: {in_file}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
     )
     logging.info(f"Drop tables before writing: {drop_tables}")
 
@@ -308,7 +308,7 @@ def main():
     # If ID DB is specified, read existing ID mappings
     prw_id_engine, mrn_to_prw_id_df = None, None
     if id_output_conn:
-        prw_id_engine = db_utils.get_db_connection(id_output_conn, echo=SHOW_SQL_IN_LOG)
+        prw_id_engine = get_db_connection(id_output_conn, echo=SHOW_SQL_IN_LOG)
         if prw_id_engine is None:
             logging.error("ERROR: cannot open ID DB (see above). Terminating.")
             exit(1)
@@ -328,7 +328,7 @@ def main():
     patients_df, id_details_df = partition_phi(patients_df)
 
     # Get connection to output DBs
-    prw_engine = db_utils.get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
+    prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
         logging.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)

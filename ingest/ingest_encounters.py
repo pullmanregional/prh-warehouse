@@ -9,7 +9,7 @@ from sqlmodel import Session, select, inspect
 from prw_common.model import prw_model, prw_id_model
 from util import prw_id_utils, prw_meta_utils
 from prw_common.cli_utils import cli_parser
-from prw_common.db_utils import TableData, get_db_connection, mask_conn_pw, clear_tables_and_insert_data
+from prw_common.db_utils import TableData, get_db_connection, mask_conn_pw, clear_tables, clear_tables_and_insert_data
 
 # Unique identifier for this ingest dataset
 DATASET_ID = "encounters"

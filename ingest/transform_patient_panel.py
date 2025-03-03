@@ -51,7 +51,7 @@ def read_source_tables(session: Session) -> SrcData:
 # -------------------------------------------------------
 PROVIDER_TO_LOCATION = {
     "ADKINS, BENJAMIN J": "CC WPL PULLMAN FAMILY MEDICINE",
-    "AIYENOWO, JOSEPH O": "CC WPL PALOUSE MED PRIMARY CARE", 
+    "AIYENOWO, JOSEPH O": "CC WPL PALOUSE MED PRIMARY CARE",
     "BRODSKY, KAZ B": "CC WPL PULLMAN FAMILY MEDICINE",
     "BURKE, MORGAN ELIZABETH": "CC WPL PALOUSE MED PRIMARY CARE",
     "CARGILL, TERESA": "CC WPL PULLMAN FAMILY MEDICINE",
@@ -120,7 +120,10 @@ def transform_filter_completed_encounters(src: SrcData):
     """
     Only look at encounters that were completed to calculate panel info
     """
-    src.encounters_df = src.encounters_df[src.encounters_df["appt_status"] == "Completed"]
+    src.encounters_df = src.encounters_df[
+        src.encounters_df["appt_status"] == "Completed"
+    ]
+
 
 def transform_add_peds_panels(src: SrcData):
     """
@@ -139,9 +142,9 @@ def transform_add_peds_panels(src: SrcData):
     encounters_df = encounters_df[encounters_df["encounter_date"] >= three_years_ago]
 
     # Mark encounters in the dept in CC WPL PALOUSE PEDIATRICS PULLMAN or CC WPL PALOUSE PEDIATRICS MOSCOW
-    encounters_df["is_peds_encounter"] = (encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS PULLMAN") | (
-        encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS MOSCOW"
-    )
+    encounters_df["is_peds_encounter"] = (
+        encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS PULLMAN"
+    ) | (encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS MOSCOW")
 
     # Mark well visits by visit type or diagnoses
     encounters_df["is_well_visit"] = encounters_df["encounter_type"].isin(
@@ -263,7 +266,9 @@ def transform_add_peds_panels(src: SrcData):
     logging.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
     print(
         "\nData Sample:\n-----------------------------------------------------------------------------------\n",
-        src.patients_df[src.patients_df["panel_location"].notna()][["prw_id", "panel_location", "panel_provider"]].head(),
+        src.patients_df[src.patients_df["panel_location"].notna()][
+            ["prw_id", "panel_location", "panel_provider"]
+        ].head(),
         "\n-----------------------------------------------------------------------------------\n",
     )
 
@@ -285,13 +290,16 @@ def transform_add_other_panels(src: SrcData):
     patients_df, encounters_df = src.patients_df, src.encounters_df
 
     # Filter out patients and encounters that already have a panel provider or location
-    patients_df = patients_df[
-        (patients_df["panel_provider"].isna()) & (patients_df["panel_location"].isna())
+    unassigned_mask = (patients_df["panel_provider"].isna()) & (
+        patients_df["panel_location"].isna()
+    )
+    unassigned_patients_df = patients_df[unassigned_mask]
+    encounters_df = encounters_df[
+        encounters_df["prw_id"].isin(unassigned_patients_df["prw_id"])
     ]
-    encounters_df = encounters_df[encounters_df["prw_id"].isin(patients_df["prw_id"])]
 
     # Initialize panel columns
-    logging.info(f"Number of unassigned patients: {len(patients_df)}")
+    logging.info(f"Number of unassigned patients: {len(unassigned_patients_df)}")
 
     # Filter to encounters in the past 2 years
     two_years_ago = pd.Timestamp.now() - pd.DateOffset(years=2)
@@ -357,9 +365,7 @@ def transform_add_other_panels(src: SrcData):
         recent_encounters["prw_id"].isin(patients_after_2nd_cut["prw_id"])
         & (
             recent_encounters["encounter_type"].isin(WELL_ENCOUNTER_TYPES)
-            | recent_encounters["diagnoses"].str.match(
-                WELL_DX_REGEX, case=False
-            )
+            | recent_encounters["diagnoses"].str.match(WELL_DX_REGEX, case=False)
         )
     ].sort_values("encounter_date", ascending=False)
 
@@ -394,23 +400,27 @@ def transform_add_other_panels(src: SrcData):
         ]
     )
     logging.info(
-        f"Total assignments: {len(all_assignments)} {len(all_assignments)/len(patients_df)*100:.2f}%"
+        f"Total assignments: {len(all_assignments)} {len(all_assignments)/len(unassigned_patients_df)*100:.2f}%"
     )
 
     # Merge all_assignments back into patients_df
     all_assignments = src.patients_df.merge(
         all_assignments, on="prw_id", how="left", suffixes=("", "_new")
     )
-    src.patients_df["panel_provider"] = all_assignments["service_provider"]
 
-    # Map providers to locations
-    src.patients_df["panel_location"] = src.patients_df["panel_provider"].map(
-        PROVIDER_TO_LOCATION
-    )
+    # Only update panel_provider and panel_location where it hasn't been set
+    src.patients_df.loc[unassigned_mask, "panel_provider"] = all_assignments.loc[
+        unassigned_mask, "service_provider"
+    ]
+    src.patients_df.loc[unassigned_mask, "panel_location"] = src.patients_df.loc[
+        unassigned_mask, "panel_provider"
+    ].map(PROVIDER_TO_LOCATION)
 
     print(
         "\nData Sample:\n-----------------------------------------------------------------------------------\n",
-        src.patients_df[["prw_id", "panel_location", "panel_provider"]].head(),
+        src.patients_df.loc[
+            unassigned_mask, ["prw_id", "panel_location", "panel_provider"]
+        ].head(),
         "\n-----------------------------------------------------------------------------------\n",
     )
 

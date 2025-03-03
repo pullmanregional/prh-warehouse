@@ -1,6 +1,8 @@
 from prefect import flow, deploy
 from prefect.runner.storage import GitRepository
 from prefect_github import GitHubCredentials
+from prefect.schedules import Schedule
+
 
 # cron syntax reference:
 # * * * * *
@@ -61,7 +63,8 @@ if __name__ == "__main__":
         entrypoint="sources/epic/prefect/flow.py:prh_sources_epic",
     ).deploy(
         name="prh-sources-epic",
-        cron="0 2 * * *",  # At 2:00 AM every day
+        # At 2:00 AM every day
+        schedule=Schedule(cron="0 2 * * *", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )
 
@@ -78,7 +81,8 @@ if __name__ == "__main__":
         entrypoint="prefect/clinic-cal-epic-ingest.py:clinic_cal_epic_ingest",
     ).deploy(
         name="clinic-cal-epic-ingest",
-        cron="0 7-18 * * 1-5",  # Every hour, between 07:00 AM and 06:00 PM, Monday through Friday
+        # Every hour, between 07:00 AM and 06:00 PM, Monday through Friday
+        schedule=Schedule(cron="0 7-18 * * 1-5", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )
 
@@ -88,6 +92,7 @@ if __name__ == "__main__":
         entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
     ).deploy(
         name="prh-dash-ingest",
-        cron="0 7-18 * * *",  # Every hour, between 07:00 AM and 06:00 PM every day
+        # Every hour, between 07:00 AM and 06:00 PM every day
+        schedule=Schedule(cron="0 7-18 * * *", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )

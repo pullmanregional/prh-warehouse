@@ -25,6 +25,8 @@ if __name__ == "__main__":
         entrypoint="prefect/prw_ingest.py:prw_ingest",
     ).deploy(
         name="prw-ingest",
+        # Daily at 5:00 AM
+        schedule=Schedule(cron="0 5 * * *", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )
 
@@ -38,6 +40,20 @@ if __name__ == "__main__":
         entrypoint="prefect/flow.py:prh_datamart_finance",
     ).deploy(
         name="prw-datamart-finance",
+        work_pool_name="ingest",
+    )
+
+    # Marketing dashboard
+    prh_streamlit_repo = GitRepository(
+        url="https://github.com/pullmanregional/streamlit.git",
+        credentials=GitHubCredentials.load("github-prh-ro"),
+        include_submodules=True,
+    )
+    flow.from_source(
+        source=prh_streamlit_repo,
+        entrypoint="marketing/prefect/flow.py:prw_datamart_marketing",
+    ).deploy(
+        name="prw-datamart-marketing",
         work_pool_name="ingest",
     )
 

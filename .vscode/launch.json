@@ -11,6 +11,27 @@
       "program": "${file}",
       "cwd": "${fileDirname}",
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Ingest Encounters (from ./data/)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "ingest_encounters.py",
+      "cwd": "${workspaceFolder}/ingest",
+      "args": [
+        "-i", "./data/epic/encounters.csv",
+        "--prw", "${input:prwConnectionString}",
+        "--prwid", "${input:prwConnectionString}"
+      ],
+      "console": "integratedTerminal"
     }
+  ],
+  "inputs": [
+    {
+      "id": "prwConnectionString",
+      "type": "promptString",
+      "description": "Enter the PRW database connection string",
+      "default": "sqlite:///../prw.sqlite3"
+    },
   ]
 }

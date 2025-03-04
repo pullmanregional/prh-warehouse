@@ -19,7 +19,7 @@
       "program": "ingest_encounters.py",
       "cwd": "${workspaceFolder}/ingest",
       "args": [
-        "-i", "./data/epic/encounters.csv",
+        "-i", "./data/epic",
         "--prw", "${input:prwConnectionString}",
         "--prwid", "${input:prwConnectionString}"
       ],

@@ -9,7 +9,13 @@ from sqlmodel import Session, select, inspect
 from prw_common.model import prw_model, prw_id_model
 from util import prw_id_utils, prw_meta_utils
 from prw_common.cli_utils import cli_parser
-from prw_common.db_utils import TableData, get_db_connection, mask_conn_pw, clear_tables, clear_tables_and_insert_data
+from prw_common.db_utils import (
+    TableData,
+    get_db_connection,
+    mask_conn_pw,
+    clear_tables,
+    clear_tables_and_insert_data,
+)
 
 # Unique identifier for this ingest dataset
 DATASET_ID = "encounters"
@@ -25,15 +31,16 @@ logging.basicConfig(level=logging.INFO)
 # -------------------------------------------------------
 # Extract from Source Files
 # -------------------------------------------------------
-def sanity_check_data_file(csv_file):
+def sanity_check_files(encounters_file, mychart_file):
     """
     Executed once at the beginning of ingest to validate CSV file
     meets basic requirements.
     """
     error = None
-    if not os.path.isfile(csv_file):
-        error = f"ERROR: input file does not exist: {csv_file}"
-
+    if not os.path.isfile(encounters_file):
+        error = f"ERROR: encounters file does not exist: {encounters_file}"
+    elif not os.path.isfile(mychart_file):
+        error = f"ERROR: mychart file does not exist: {mychart_file}"
     if error is not None:
         print(error)
 
@@ -84,7 +91,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
         ],
         dtype={
             "mrn": str,
-            "name": str, 
+            "name": str,
             "sex": str,
             "dob": str,
             "address": str,
@@ -103,7 +110,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
             "appt_status": str,
             "diagnoses": str,
             "level_of_service": str,
-            "level_of_service_name": str
+            "level_of_service_name": str,
         },
         index_col=False,
     )
@@ -158,7 +165,9 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     encounters_df["encounter_date"] = pd.to_datetime(
         encounters_df["encounter_date"].astype(str), format="%Y%m%d"
     ).dt.date
-    encounters_df["encounter_time"] = encounters_df["encounter_time"].astype(str).str.zfill(4)
+    encounters_df["encounter_time"] = (
+        encounters_df["encounter_time"].astype(str).str.zfill(4)
+    )
 
     # -------------------------------------------------------
     # Add prw_id to patients and encounters
@@ -180,6 +189,27 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     encounters_df.drop(columns=["mrn"], inplace=True)
 
     return patients_df, encounters_df
+
+
+def read_patient_mychart_status(patients_df: pd.DataFrame, mychart_file: str):
+    """
+    Read mychart file and add info into patients_df
+    """
+    mychart_df = pd.read_csv(
+        mychart_file,
+        skiprows=1,
+        index_col=False,
+        names=["mrn", "mychart_status", "mychart_activation_date"],
+        dtype={"mrn": str, "mychart_status": str, "mychart_activation_date": str},
+    )
+
+    # Drop unused columns
+    mychart_df.drop(columns=["mychart_activation_date"], inplace=True)
+
+    # Merge with patients_df by MRN
+    mychart_df = mychart_df.drop_duplicates(subset=["mrn"], keep="first")
+    patients_df = patients_df.merge(mychart_df, on="mrn", how="left")
+    return patients_df
 
 
 # -------------------------------------------------------
@@ -247,23 +277,21 @@ def partition_phi(patients_df: pd.DataFrame):
     Partition patients_df into PHI, which will be stored in ID DB, and non-PHI, which will be stored in the main DB
     """
     logging.info("Partitioning PHI")
-    id_details_df = patients_df[
-        [
-            "prw_id",
-            "mrn",
-            "name",
-            "dob",
-            "address",
-            "city",
-            "state",
-            "zip",
-            "phone",
-            "email",
-        ]
+    PHI_COLUMNS = [
+        "mrn",
+        "name",
+        "dob",
+        "address",
+        "city",
+        "state",
+        "zip",
+        "phone",
+        "email",
     ]
-    patients_df = patients_df[
-        ["prw_id", "sex", "age", "age_in_mo_under_3", "city", "state", "pcp"]
-    ]
+    id_details_df = patients_df[["prw_id"] + PHI_COLUMNS]
+
+    # Remove PHI columns from main dataset
+    patients_df = patients_df.drop(columns=PHI_COLUMNS).copy()
 
     return patients_df, id_details_df
 
@@ -291,17 +319,21 @@ def parse_arguments():
 def main():
     # Load config from cmd line
     args = parse_arguments()
-    in_file = args.input
+    in_path = args.input
     output_conn = args.prw
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
     drop_tables = args.drop
     logging.info(
-        f"Input: {in_file}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
+        f"Input: {in_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
     )
     logging.info(f"Drop tables before writing: {drop_tables}")
 
+    # Input files
+    encounters_file = os.path.join(in_path, "encounters.csv")
+    mychart_file = os.path.join(in_path, "mychart.csv")
+
     # Sanity check the input file
-    if not sanity_check_data_file(in_file):
+    if not sanity_check_files(encounters_file, mychart_file):
         logging.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
@@ -319,7 +351,8 @@ def main():
             logging.info("ID DB table does not exist, will generate new ID mappings")
 
     # Read source file into memory
-    patients_df, encounters_df = read_encounters(in_file, mrn_to_prw_id_df)
+    patients_df, encounters_df = read_encounters(encounters_file, mrn_to_prw_id_df)
+    patients_df = read_patient_mychart_status(patients_df, mychart_file)
 
     # Transform data only to partition PHI into separate DB. All other data
     # transformations should be done by later flows in the pipeline.
@@ -356,7 +389,7 @@ def main():
     )
 
     # Update last ingest time and modified times for source data files
-    modified = {in_file: datetime.fromtimestamp(os.path.getmtime(in_file))}
+    modified = {in_path: datetime.fromtimestamp(os.path.getmtime(in_path))}
     prw_meta_utils.write_meta(prw_session, DATASET_ID, modified)
 
     # Cleanup

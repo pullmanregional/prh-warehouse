@@ -33,7 +33,7 @@ PRW_ENV = load_prw_env(__file__)
 os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.pyenv/shims/"
 
 # Load config from env vars into constants
-PRW_ENCOUNTERS_SOURCE = os.environ.get("PRW_ENCOUNTERS_SOURCE")
+PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
 PRW_CONN = os.environ.get("PRW_CONN") or Secret.load("prw-db-url").get()
 PRW_ID_CONN = os.environ.get("PRW_ID_CONN") or Secret.load("prw-id-db-url").get()
@@ -56,7 +56,7 @@ DATAMART_DEPLOYMENTS = [
 @flow
 async def prw_ingest_encounters(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE}" -prw "{PRW_CONN}" -prwid "{PRW_ID_CONN}" {drop_flag}'
+    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -prw "{PRW_CONN}" -prwid "{PRW_ID_CONN}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,

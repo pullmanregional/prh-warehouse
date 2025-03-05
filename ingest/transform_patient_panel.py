@@ -6,7 +6,13 @@ from sqlmodel import Session
 from util import util, prw_meta_utils
 from prw_common.model.prw_panel_model import *
 from prw_common.cli_utils import cli_parser
-from prw_common.db_utils import TableData, get_db_connection, mask_conn_pw, clear_tables_and_insert_data
+from prw_common.db_utils import (
+    TableData,
+    get_db_connection,
+    mask_conn_pw,
+    clear_tables_and_insert_data,
+)
+
 # -------------------------------------------------------
 # Config
 # -------------------------------------------------------
@@ -42,12 +48,22 @@ def read_source_tables(session: Session) -> SrcData:
     logging.info("Reading source tables")
     patients_df = pd.read_sql_table("prw_patients", session.bind)
     encounters_df = pd.read_sql_table("prw_encounters", session.bind)
+
+    # Convert encounter_date from YYYYMMDD int to datetime
+    encounters_df["encounter_date"] = pd.to_datetime(
+        encounters_df["encounter_date"].astype(str), format="%Y%m%d"
+    )
+
     return SrcData(patients_df=patients_df, encounters_df=encounters_df)
 
 
 # -------------------------------------------------------
 # Transform
 # -------------------------------------------------------
+PEDS_LOCATIONS = [
+    "CC WPL PALOUSE PEDIATRICS PULLMAN",
+    "CC WPL PALOUSE PEDIATRICS MOSCOW",
+]
 PROVIDER_TO_LOCATION = {
     "ADKINS, BENJAMIN J": "CC WPL PULLMAN FAMILY MEDICINE",
     "AIYENOWO, JOSEPH O": "CC WPL PALOUSE MED PRIMARY CARE",
@@ -141,9 +157,7 @@ def transform_add_peds_panels(src: SrcData):
     encounters_df = encounters_df[encounters_df["encounter_date"] >= three_years_ago]
 
     # Mark encounters in the dept in CC WPL PALOUSE PEDIATRICS PULLMAN or CC WPL PALOUSE PEDIATRICS MOSCOW
-    encounters_df["is_peds_encounter"] = (
-        encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS PULLMAN"
-    ) | (encounters_df["dept"] == "CC WPL PALOUSE PEDIATRICS MOSCOW")
+    encounters_df["is_peds_encounter"] = encounters_df["dept"].isin(PEDS_LOCATIONS)
 
     # Mark well visits by visit type or diagnoses
     encounters_df["is_well_visit"] = encounters_df["encounter_type"].isin(
@@ -173,90 +187,99 @@ def transform_add_peds_panels(src: SrcData):
         encounters_df["encounter_date"] >= one_year_ago
     ].copy()
 
-    def get_last_n_encounters(df, prw_id, n=3):
-        """Helper function to get the last n encounters for a patient"""
-        return (
-            df[df["prw_id"] == prw_id]
-            .sort_values("encounter_date", ascending=False)
-            .head(n)
-        )
+    # Prepare data structures for vectorized operations
+    # Create a DataFrame with patient IDs to track rule results
+    patient_ids = patients_df["prw_id"].unique()
+    results_df = pd.DataFrame({"prw_id": patient_ids})
+    results_df["meets_rule_1"] = False
+    results_df["meets_rule_2"] = False
+    results_df["meets_rule_3"] = False
+    results_df["should_remove_rule_4"] = False
+    
+    # Group encounters by patient for efficient processing
+    recent_by_patient = dict(list(recent_encounters.groupby("prw_id")))
+    last_year_by_patient = dict(list(last_year_encounters.groupby("prw_id")))
+    all_by_patient = dict(list(encounters_df.groupby("prw_id")))
+    
+    # Process rule 1 for all patients
+    logging.info("Calculating rule 1")
+    for i, prw_id in enumerate(patient_ids):
+        if prw_id in recent_by_patient:
+            patient_encounters = recent_by_patient[prw_id]
+            if patient_encounters["is_peds_encounter"].sum() >= 3:
+                # Get last three encounters
+                last_three = patient_encounters.sort_values("encounter_date", ascending=False).head(3)
+                if all(last_three["is_peds_encounter"]):
+                    results_df.loc[results_df["prw_id"] == prw_id, "meets_rule_1"] = True
+    logging.info(f"Rule 1 assignments: {results_df['meets_rule_1'].sum()}")
+    
+    # Process rule 2 for all patients
+    logging.info("Calculating rule 2")
+    for i, prw_id in enumerate(patient_ids):
+        if prw_id in recent_by_patient:
+            patient_encounters = recent_by_patient[prw_id]
+            # Get well visits
+            well_visits = patient_encounters[patient_encounters["is_well_visit"]]
+            
+            if len(well_visits) > 0:
+                # Get the most recent well visit
+                last_well = well_visits.sort_values("encounter_date", ascending=False).iloc[0]
+                
+                if last_well["is_peds_encounter"]:
+                    # Check if at least one of last 3 visits was at peds
+                    last_three = patient_encounters.sort_values("encounter_date", ascending=False).head(3)
+                    if any(last_three["is_peds_encounter"]):
+                        results_df.loc[results_df["prw_id"] == prw_id, "meets_rule_2"] = True
+    logging.info(f"Rule 2 assignments: {results_df['meets_rule_2'].sum()}")
 
-    def meets_rule_1(prw_id):
-        """At least 3 visits in last 2 years, and last 3 were at peds"""
-        patient_encounters = recent_encounters[recent_encounters["prw_id"] == prw_id]
-        if patient_encounters["is_peds_encounter"].sum() < 3:
-            return False
-
-        last_three = get_last_n_encounters(patient_encounters, prw_id, 3)
-        return all(last_three["is_peds_encounter"])
-
-    def meets_rule_2(prw_id):
-        """Last well visit was in last 2 years AND at peds AND one of last 3 visits at peds"""
-        patient_encounters = recent_encounters[recent_encounters["prw_id"] == prw_id]
-
-        # Get last well visit
-        well_visits = patient_encounters[patient_encounters["is_well_visit"]]
-        if len(well_visits) == 0:
-            return False
-
-        last_well = well_visits.sort_values("encounter_date", ascending=False).iloc[0]
-        if not last_well["is_peds_encounter"]:
-            return False
-
-        # Check if at least one of last 3 visits was at peds
-        last_three = get_last_n_encounters(patient_encounters, prw_id, 3)
-        return any(last_three["is_peds_encounter"])
-
-    def meets_rule_3(prw_id):
-        """No well visit in 2 years AND 3+ visits in last year AND majority peds AND one of last 3 at peds"""
-        # Check if there are any well visits in last 2 years
-        recent_well_visits = recent_encounters[
-            (recent_encounters["prw_id"] == prw_id)
-            & (recent_encounters["is_well_visit"])
-        ]
-        if len(recent_well_visits) > 0:
-            return False
-
-        # Check last year's visits
-        last_year_patient = last_year_encounters[
-            last_year_encounters["prw_id"] == prw_id
-        ]
-        if len(last_year_patient) < 3:
-            return False
-
-        # Check if majority are peds
-        peds_visits = sum(last_year_patient["is_peds_encounter"])
-        if peds_visits <= len(last_year_patient) / 2:
-            return False
-
-        # Check if at least one of last 3 visits was at peds
-        last_three = get_last_n_encounters(encounters_df, prw_id, 3)
-        return any(last_three["is_peds_encounter"])
-
-    def should_remove_by_rule_4(prw_id):
-        """Remove if < 3yo and no peds appointment in 15 months"""
-        patient = patients_df[patients_df["prw_id"] == prw_id].iloc[0]
-
+    # Process rule 3 for all patients
+    logging.info("Calculating rule 3")
+    for i, prw_id in enumerate(patient_ids):
+        if prw_id in recent_by_patient and prw_id in last_year_by_patient:
+            recent_patient = recent_by_patient[prw_id]
+            last_year_patient = last_year_by_patient[prw_id]
+            
+            # Check if there are any well visits in last 2 years
+            recent_well_visits = recent_patient[recent_patient["is_well_visit"]]
+            
+            if len(recent_well_visits) == 0 and len(last_year_patient) >= 3:
+                # Check if majority are peds
+                peds_visits = last_year_patient["is_peds_encounter"].sum()
+                
+                if peds_visits > len(last_year_patient) / 2:
+                    # Check if at least one of last 3 visits was at peds
+                    if prw_id in all_by_patient:
+                        last_three = last_year_patient.sort_values("encounter_date", ascending=False).head(3)
+                        if any(last_three["is_peds_encounter"]):
+                            results_df.loc[results_df["prw_id"] == prw_id, "meets_rule_3"] = True
+    logging.info(f"Rule 3 assignments: {results_df['meets_rule_3'].sum()}")
+    
+    # Process rule 4 for all patients
+    logging.info("Calculating rule 4") 
+    # Create a Series mapping prw_id to age for faster lookup
+    age_map = patients_df.set_index("prw_id")["age"]
+    
+    for i, prw_id in enumerate(patient_ids):
         # Check if patient is under 3
-        if patient["age"] >= 3:
-            return False
-
-        # Check for any peds appointments in last 15 months
-        recent_peds = encounters_df[
-            (encounters_df["prw_id"] == prw_id)
-            & (encounters_df["encounter_date"] >= fifteen_months_ago)
-            & (encounters_df["is_peds_encounter"])
-        ]
-        return len(recent_peds) == 0
-
-    # Apply rules to each patient
-    empaneled_patients = []
-    for i, prw_id in enumerate(patients_df["prw_id"]):
-        if meets_rule_1(prw_id) or meets_rule_2(prw_id) or meets_rule_3(prw_id):
-            if not should_remove_by_rule_4(prw_id):
-                empaneled_patients.append(prw_id)
-        if (i + 1) % 1000 == 0:
-            logging.info(f"{i + 1} / {len(patients_df)} patients...")
+        if prw_id in age_map and age_map[prw_id] < 3:
+            # Check for any peds appointments in last 15 months
+            if prw_id in recent_by_patient:
+                recent_peds = recent_by_patient[prw_id][
+                    (recent_by_patient[prw_id]["encounter_date"] >= fifteen_months_ago) &
+                    (recent_by_patient[prw_id]["is_peds_encounter"])
+                ]
+                if len(recent_peds) == 0:
+                    results_df.loc[results_df["prw_id"] == prw_id, "should_remove_rule_4"] = True
+    logging.info(f"Rule 4 removals: {results_df['should_remove_rule_4'].sum()}")
+    
+    # Combine all rules to get final empaneled patients
+    results_df["should_empanel"] = (
+        (results_df["meets_rule_1"] | results_df["meets_rule_2"] | results_df["meets_rule_3"]) & 
+        ~results_df["should_remove_rule_4"]
+    )
+    
+    # Get list of empaneled patients
+    empaneled_patients = results_df[results_df["should_empanel"]]["prw_id"].tolist()
 
     # Update panel_location for empaneled patients
     mask = src.patients_df["prw_id"].isin(empaneled_patients)

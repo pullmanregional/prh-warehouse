@@ -24,6 +24,17 @@
         "--prwid", "${input:prwConnectionString}"
       ],
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Transform Patient Panel (use prw.sqlite3)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "transform_patient_panel.py",
+      "cwd": "${workspaceFolder}/ingest",
+      "args": [
+        "--prw", "${input:prwConnectionString}",
+      ],
+      "console": "integratedTerminal"
     }
   ],
   "inputs": [

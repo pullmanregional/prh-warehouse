@@ -383,9 +383,12 @@ def main():
         logging.info("Dropping existing tables")
         prw_model.PrwMetaModel.metadata.drop_all(prw_engine)
         prw_model.PrwModel.metadata.drop_all(prw_engine)
+        prw_model.PrwMyChartModel.metadata.drop_all(prw_engine)
+    
     logging.info("Creating tables")
     prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)
+    prw_model.PrwMyChartModel.metadata.create_all(prw_engine)
 
     # Explicitly drop data in tables in order for foreign key constraints to be met
     clear_tables(prw_session, [prw_model.PrwEncounter, prw_model.PrwPatient])

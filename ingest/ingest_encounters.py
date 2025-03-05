@@ -153,18 +153,15 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     patients_df["mrn"] = patients_df["mrn"].astype(str)
     encounters_df["mrn"] = encounters_df["mrn"].astype(str)
 
+    # Convert dob from YYYY-MM-DD to an int YYYYMMDD
+    patients_df["dob"] = pd.to_datetime(patients_df["dob"]).apply(
+        lambda x: int(x.strftime("%Y%m%d")) if pd.notna(x) else None
+    )
+
     # Convert with_pcp to boolean (CSV might have 0/1 instead of True/False)
     encounters_df["with_pcp"] = encounters_df["with_pcp"].astype(bool)
 
-    # Handle date/time formats
-    # BirthDate column is in YYYY-MM-DD format
-    patients_df["dob"] = pd.to_datetime(patients_df["dob"])
-
-    # AppointmentDateKey is in YYYYMMDD format (e.g., 20240301)
-    # AppointmentTimeOfDayKey is in HHMM 24-hour format (e.g., 1400)
-    encounters_df["encounter_date"] = pd.to_datetime(
-        encounters_df["encounter_date"].astype(str), format="%Y%m%d"
-    ).dt.date
+    # AppointmentTimeOfDayKey is in HHMM 24-hour format (e.g., 1400), keep 4 character string
     encounters_df["encounter_time"] = (
         encounters_df["encounter_time"].astype(str).str.zfill(4)
     )
@@ -188,10 +185,10 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     encounters_df = encounters_df.merge(mrn_to_prw_id_df, on="mrn", how="left")
     encounters_df.drop(columns=["mrn"], inplace=True)
 
-    return patients_df, encounters_df
+    return patients_df, encounters_df, mrn_to_prw_id_df
 
 
-def read_patient_mychart_status(patients_df: pd.DataFrame, mychart_file: str):
+def read_mychart_status(mychart_file: str, mrn_to_prw_id_df: pd.DataFrame):
     """
     Read mychart file and add info into patients_df
     """
@@ -203,13 +200,17 @@ def read_patient_mychart_status(patients_df: pd.DataFrame, mychart_file: str):
         dtype={"mrn": str, "mychart_status": str, "mychart_activation_date": str},
     )
 
-    # Drop unused columns
-    mychart_df.drop(columns=["mychart_activation_date"], inplace=True)
+    # Convert non null mychart_activation_date records to an int YYYYMMDD
+    mychart_df["mychart_activation_date"] = mychart_df["mychart_activation_date"].apply(
+        lambda x: int(x) if x is not None else None
+    )
 
-    # Merge with patients_df by MRN
+    # Drop duplicate MRNs and map to prw_id
     mychart_df = mychart_df.drop_duplicates(subset=["mrn"], keep="first")
-    patients_df = patients_df.merge(mychart_df, on="mrn", how="left")
-    return patients_df
+    mychart_df = mychart_df.merge(mrn_to_prw_id_df, on="mrn", how="inner")
+    mychart_df.drop(columns=["mrn"], inplace=True)
+
+    return mychart_df
 
 
 # -------------------------------------------------------
@@ -222,17 +223,26 @@ def calc_patient_age(patients_df: pd.DataFrame):
     # Calculate age and age in months (if <3yo) from dob
     logging.info("Calculating patient ages")
     now = pd.Timestamp.now()
-    patients_df["age"] = patients_df["dob"].apply(
-        lambda dob: relativedelta(now, dob).years
+
+    # Convert dob from YYYYMMDD int to datetime
+    dob_df = pd.to_datetime(patients_df["dob"].astype(str), format="%Y%m%d")
+    
+    # Calculate age in years
+    # Adjust by 1 year if birthday hasn't occurred this year
+    patients_df["age"] = (now.year - dob_df.dt.year)
+    mask = (now.month < dob_df.dt.month) | (
+        (now.month == dob_df.dt.month) & 
+        (now.day < dob_df.dt.day)
     )
-    patients_df["age_in_mo_under_3"] = patients_df["dob"].apply(
-        lambda dob: (
-            relativedelta(now, dob).years * 12 + relativedelta(now, dob).months
-            if relativedelta(now, dob).years <= 2
-            else None
-        )
+    patients_df.loc[mask, "age"] -= 1
+
+    # Calculate age in months, but only retain if under 3
+    patients_df["age_in_mo_under_3"] = (
+        (now.year - dob_df.dt.year) * 12 +
+        (now.month - dob_df.dt.month) -
+        (now.day < dob_df.dt.day)
     )
-    # Convert to integer type
+    patients_df.loc[patients_df["age"] > 2, "age_in_mo_under_3"] = None
     patients_df["age_in_mo_under_3"] = patients_df["age_in_mo_under_3"].astype("Int64")
     return patients_df
 
@@ -247,27 +257,28 @@ def calc_age_at_encounter(encounters_df: pd.DataFrame, patients_df: pd.DataFrame
         patients_df[["prw_id", "dob"]], on="prw_id", how="left"
     )
 
-    # Calculate age of patient at encounter in years and months (if under 3) encounter_date and dob
-    encounters_df["encounter_age"] = encounters_df.apply(
-        lambda row: relativedelta(
-            pd.Timestamp(row["encounter_date"]), row["dob"]
-        ).years,
-        axis=1,
+    # Convert dob and encounter_date from YYYYMMDD int to datetime
+    dates_df = pd.DataFrame()
+    dates_df["dob"] = pd.to_datetime(encounters_df["dob"].astype(str), format="%Y%m%d")
+    dates_df["encounter_date"] = pd.to_datetime(encounters_df["encounter_date"].astype(str), format="%Y%m%d")
+
+    # Calculate age of patient at encounter in years (if under 3)
+    # Adjust by 1 year if birthday hasn't occurred in encounter year
+    encounters_df["encounter_age"] = (dates_df["encounter_date"].dt.year - dates_df["dob"].dt.year)
+    mask = (dates_df["encounter_date"].dt.month < dates_df["dob"].dt.month) | (
+        (dates_df["encounter_date"].dt.month == dates_df["dob"].dt.month) & 
+        (dates_df["encounter_date"].dt.day < dates_df["dob"].dt.day)
     )
-    encounters_df["encounter_age_in_mo_under_3"] = encounters_df.apply(
-        lambda row: (
-            relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).years * 12
-            + relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).months
-            if relativedelta(pd.Timestamp(row["encounter_date"]), row["dob"]).years <= 2
-            else None
-        ),
-        axis=1,
+    encounters_df.loc[mask, "encounter_age"] -= 1
+
+    # Calculate age in months, but only retain if under 3
+    encounters_df["encounter_age_in_mo_under_3"] = (
+        (dates_df["encounter_date"].dt.year - dates_df["dob"].dt.year) * 12 +
+        (dates_df["encounter_date"].dt.month - dates_df["dob"].dt.month) -
+        (dates_df["encounter_date"].dt.day < dates_df["dob"].dt.day)
     )
-    # Convert to integer type
-    encounters_df["encounter_age_in_mo_under_3"] = encounters_df[
-        "encounter_age_in_mo_under_3"
-    ].astype("Int64")
-    encounters_df.drop(columns=["dob"], inplace=True)
+    encounters_df.loc[encounters_df["encounter_age"] > 2, "encounter_age_in_mo_under_3"] = None
+    encounters_df["encounter_age_in_mo_under_3"] = encounters_df["encounter_age_in_mo_under_3"].astype("Int64")
 
     return encounters_df
 
@@ -351,8 +362,8 @@ def main():
             logging.info("ID DB table does not exist, will generate new ID mappings")
 
     # Read source file into memory
-    patients_df, encounters_df = read_encounters(encounters_file, mrn_to_prw_id_df)
-    patients_df = read_patient_mychart_status(patients_df, mychart_file)
+    patients_df, encounters_df, mrn_to_prw_id_df = read_encounters(encounters_file, mrn_to_prw_id_df)
+    mychart_df = read_mychart_status(mychart_file, mrn_to_prw_id_df)
 
     # Transform data only to partition PHI into separate DB. All other data
     # transformations should be done by later flows in the pipeline.
@@ -385,6 +396,7 @@ def main():
         [
             TableData(table=prw_model.PrwPatient, df=patients_df),
             TableData(table=prw_model.PrwEncounter, df=encounters_df),
+            TableData(table=prw_model.PrwMyChart, df=mychart_df),
         ],
     )
 

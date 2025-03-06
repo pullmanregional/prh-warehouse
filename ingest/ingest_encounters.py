@@ -4,7 +4,6 @@ import warnings
 import pandas as pd
 from typing import List
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 from sqlmodel import Session, select, inspect
 from prw_common.model import prw_model, prw_id_model
 from util import prw_id_utils, prw_meta_utils
@@ -383,12 +382,10 @@ def main():
         logging.info("Dropping existing tables")
         prw_model.PrwMetaModel.metadata.drop_all(prw_engine)
         prw_model.PrwModel.metadata.drop_all(prw_engine)
-        prw_model.PrwMyChartModel.metadata.drop_all(prw_engine)
     
     logging.info("Creating tables")
     prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)
-    prw_model.PrwMyChartModel.metadata.create_all(prw_engine)
 
     # Explicitly drop data in tables in order for foreign key constraints to be met
     clear_tables(prw_session, [prw_model.PrwEncounter, prw_model.PrwPatient])

@@ -57,6 +57,16 @@ if __name__ == "__main__":
         work_pool_name="ingest",
     )
 
+    # Patient panel
+    flow.from_source(
+        source=prh_streamlit_repo,
+        entrypoint="panel/prefect/flow.py:prw_datamart_panel",
+    ).deploy(
+        name="prw-datamart-panel",
+        work_pool_name="ingest",
+    )
+
+
     # SQL reports
     prw_exporter_repo = GitRepository(
         url="https://github.com/pullmanregional/prw-exporter.git",

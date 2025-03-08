@@ -65,45 +65,45 @@ PEDS_LOCATIONS = [
     "CC WPL PALOUSE PEDIATRICS MOSCOW",
 ]
 PROVIDER_TO_LOCATION = {
-    "ADKINS, BENJAMIN J": "CC WPL PULLMAN FAMILY MEDICINE",
-    "AIYENOWO, JOSEPH O": "CC WPL PALOUSE MED PRIMARY CARE",
-    "BRODSKY, KAZ B": "CC WPL PULLMAN FAMILY MEDICINE",
-    "BURKE, MORGAN ELIZABETH": "CC WPL PALOUSE MED PRIMARY CARE",
-    "CARGILL, TERESA": "CC WPL PULLMAN FAMILY MEDICINE",
-    "DAVIS, JENNIFER": "CC WPL PULLMAN FAMILY MEDICINE",
-    "FOSBACK, STEPHANIE M": "CC WPL PALOUSE MED PRIMARY CARE",
-    "FROSTAD, MICHAEL": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "GARCIA, CLARA E": "CC WPL PALOUSE MED PRIMARY CARE",
-    "GORDON, METHUEL": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "GREGORY, NANCY": "CC WPL PALOUSE MED PRIMARY CARE",
-    "GUIDA, KIMBERLEY": "CC WPL PULLMAN FAMILY MEDICINE",
-    "HALL, STEPHEN": "CC WPL PALOUSE MED PRIMARY CARE",
-    "HARRIS, BRENNA R": "CC WPL FM RESIDENCY CLINIC",
-    "HATLEY, SHANNON M": "CC WPL PULLMAN FAMILY MEDICINE",
-    "HOOVER, MARK A": "CC WPL PALOUSE MED PRIMARY CARE",
-    "HOWELL, RICHARD L": "CC WPL PALOUSE MED PRIMARY CARE",
-    "HRYNIEWICZ, KATHRYN": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "IACOBELLI, CHRISTOPHER J": "CC WPL PALOUSE MED PRIMARY CARE",
-    "LEE, JONATHAN": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "LEE, JONATHAN J": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "LEIDER, MORGAN": "CC WPL PALOUSE MED PRIMARY CARE",
-    "MADER, KELSEY": "CC WPL FM RESIDENCY CLINIC",
-    "OLAWUYI, DAMOLA BOLUTIFE": "CC WPL FM RESIDENCY CLINIC",
-    "PERIN, KARLY": "CC WPL FM RESIDENCY CLINIC",
-    "RINALDI, MACKENZIE CLAIRE": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "SANGHA, DILDEEP": "CC WPL PULLMAN FAMILY MEDICINE",
-    "SHAKIR, TUARUM N": "CC WPL FM RESIDENCY CLINIC",
-    "SHIELDS, MARICARMEN": "CC WPL PALOUSE PEDIATRICS PULLMAN",
-    "SHONK, JENNIFER L": "CC WPL FM RESIDENCY CLINIC",
-    "SMITH, ANGELINE ELIZABETH": "CC WPL PULLMAN FAMILY MEDICINE",
-    "STANCIL, LAKEESHA": "CC WPL PULLMAN FAMILY MEDICINE",
-    "THOMPSON, MOLLY": "CC WPL FM RESIDENCY CLINIC",
-    "TRICOLA, KASSANDRA M": "CC WPL PALOUSE MED PRIMARY CARE",
-    "WARD, JEFFREY LOREN": "CC WPL FM RESIDENCY CLINIC",
-    "WEBB, DRUE": "CC WPL PULLMAN FAMILY MEDICINE",
-    "WEBBER, MOLLY": "CC WPL FM RESIDENCY CLINIC",
-    "WHITE, MALIA": "CC WPL PULLMAN FAMILY MEDICINE",
-    "YOUNES, MOHAMMED": "CC WPL FM RESIDENCY CLINIC",
+    # Palouse Pediatrics
+    "FROSTAD, MICHAEL": "Palouse Pediatrics",
+    "GORDON, METHUEL": "Palouse Pediatrics",
+    "HRYNIEWICZ, KATHRYN": "Palouse Pediatrics",
+    "LEE, JONATHAN": "Palouse Pediatrics",
+    "LEE, JONATHAN J": "Palouse Pediatrics",
+    "RINALDI, MACKENZIE CLAIRE": "Palouse Pediatrics",
+    "SHIELDS, MARICARMEN": "Palouse Pediatrics",
+    # Pullman Family Medicine
+    "ADKINS, BENJAMIN J": "Pullman Family Medicine",
+    "BRODSKY, KAZ B": "Pullman Family Medicine",
+    "CARGILL, TERESA": "Pullman Family Medicine",
+    "DAVIS, JENNIFER": "Pullman Family Medicine",
+    "GUIDA, KIMBERLEY": "Pullman Family Medicine",
+    "SANGHA, DILDEEP": "Pullman Family Medicine",
+    "SMITH, ANGELINE ELIZABETH": "Pullman Family Medicine",
+    # Palouse Medical
+    "HALL, STEPHEN": "Palouse Medical",
+    "IACOBELLI, CHRISTOPHER J": "Palouse Medical",
+    "TRICOLA, KASSANDRA M": "Palouse Medical",
+    "GARCIA, CLARA E": "Palouse Medical",
+    "FOSBACK, STEPHANIE M": "Palouse Medical",
+    "GREGORY, NANCY": "Palouse Medical",
+    "HOWELL, RICHARD L": "Palouse Medical",
+    "AIYENOWO, JOSEPH O": "Palouse Medical",
+    "BURKE, MORGAN ELIZABETH": "Palouse Medical",
+    "HOOVER, MARK A": "Palouse Medical",
+    "LEIDER, MORGAN": "Palouse Medical",
+    # Residency
+    "HARRIS, BRENNA R": "Residency",
+    "MADER, KELSEY": "Residency",
+    "SHAKIR, TUARUM N": "Residency",
+    "THOMPSON, MOLLY": "Residency",
+    "WARD, JEFFREY LOREN": "Residency",
+    "OLAWUYI, DAMOLA BOLUTIFE": "Residency",
+    "PERIN, KARLY": "Residency",
+    "WEBB, DRUE": "Residency",
+    "WEBBER, MOLLY": "Residency",
+    "YOUNES, MOHAMMED": "Residency",
 }
 WELL_ENCOUNTER_TYPES = [
     "CC WELL BABY",
@@ -131,12 +131,25 @@ WELL_DX_STRINGS = [
 WELL_DX_REGEX = "|".join(f"[{code}]" for code in WELL_DX_STRINGS)
 
 
-def transform_filter_completed_encounters(src: SrcData):
+def transform_filter_encounters(src: SrcData):
     """
-    Only look at encounters that were completed to calculate panel info
+    Only look at actual office visits that were completed to calculate panel info
     """
     src.encounters_df = src.encounters_df[
-        src.encounters_df["appt_status"] == "Completed"
+        # Filter out non-office visits types - manually reviewed from unique values in column
+        ~src.encounters_df["encounter_type"].isin(
+            [
+                "CC CLINICAL SUPPORT",
+                "CC NURSE VISIT",
+                "CC LAB",
+                "CC ANTICOAGULATION",
+                "COVID-19 VACCINE",
+                "PHS SILENT US",
+            ]
+        )
+        &
+        # Only retain completed encounters
+        (src.encounters_df["appt_status"] == "Completed")
     ]
 
 
@@ -195,12 +208,12 @@ def transform_add_peds_panels(src: SrcData):
     results_df["meets_rule_2"] = False
     results_df["meets_rule_3"] = False
     results_df["should_remove_rule_4"] = False
-    
+
     # Group encounters by patient for efficient processing
     recent_by_patient = dict(list(recent_encounters.groupby("prw_id")))
     last_year_by_patient = dict(list(last_year_encounters.groupby("prw_id")))
     all_by_patient = dict(list(encounters_df.groupby("prw_id")))
-    
+
     # Process rule 1 for all patients
     logging.info("Calculating rule 1")
     for i, prw_id in enumerate(patient_ids):
@@ -208,11 +221,18 @@ def transform_add_peds_panels(src: SrcData):
             patient_encounters = recent_by_patient[prw_id]
             if patient_encounters["is_peds_encounter"].sum() >= 3:
                 # Get last three encounters
-                last_three = patient_encounters.sort_values("encounter_date", ascending=False).head(3)
+                last_three = patient_encounters.sort_values(
+                    "encounter_date", ascending=False
+                ).head(3)
                 if all(last_three["is_peds_encounter"]):
-                    results_df.loc[results_df["prw_id"] == prw_id, "meets_rule_1"] = True
+                    results_df.loc[results_df["prw_id"] == prw_id, "meets_rule_1"] = (
+                        True
+                    )
+                    results_df.loc[
+                        results_df["prw_id"] == prw_id, "assignment_details"
+                    ] = "Rule 1: At least 3 visits in the last 2 years, and the last 3 were at peds"
     logging.info(f"Rule 1 assignments: {results_df['meets_rule_1'].sum()}")
-    
+
     # Process rule 2 for all patients
     logging.info("Calculating rule 2")
     for i, prw_id in enumerate(patient_ids):
@@ -220,16 +240,25 @@ def transform_add_peds_panels(src: SrcData):
             patient_encounters = recent_by_patient[prw_id]
             # Get well visits
             well_visits = patient_encounters[patient_encounters["is_well_visit"]]
-            
+
             if len(well_visits) > 0:
                 # Get the most recent well visit
-                last_well = well_visits.sort_values("encounter_date", ascending=False).iloc[0]
-                
+                last_well = well_visits.sort_values(
+                    "encounter_date", ascending=False
+                ).iloc[0]
+
                 if last_well["is_peds_encounter"]:
                     # Check if at least one of last 3 visits was at peds
-                    last_three = patient_encounters.sort_values("encounter_date", ascending=False).head(3)
+                    last_three = patient_encounters.sort_values(
+                        "encounter_date", ascending=False
+                    ).head(3)
                     if any(last_three["is_peds_encounter"]):
-                        results_df.loc[results_df["prw_id"] == prw_id, "meets_rule_2"] = True
+                        results_df.loc[
+                            results_df["prw_id"] == prw_id, "meets_rule_2"
+                        ] = True
+                        results_df.loc[
+                            results_df["prw_id"] == prw_id, "assignment_details"
+                        ] = "Rule 2: Last well visit was in the last 2 years AND it was at peds AND at least one of the last 3 visits was at peds"
     logging.info(f"Rule 2 assignments: {results_df['meets_rule_2'].sum()}")
 
     # Process rule 3 for all patients
@@ -238,46 +267,56 @@ def transform_add_peds_panels(src: SrcData):
         if prw_id in recent_by_patient and prw_id in last_year_by_patient:
             recent_patient = recent_by_patient[prw_id]
             last_year_patient = last_year_by_patient[prw_id]
-            
+
             # Check if there are any well visits in last 2 years
             recent_well_visits = recent_patient[recent_patient["is_well_visit"]]
-            
+
             if len(recent_well_visits) == 0 and len(last_year_patient) >= 3:
                 # Check if majority are peds
                 peds_visits = last_year_patient["is_peds_encounter"].sum()
-                
+
                 if peds_visits > len(last_year_patient) / 2:
                     # Check if at least one of last 3 visits was at peds
                     if prw_id in all_by_patient:
-                        last_three = last_year_patient.sort_values("encounter_date", ascending=False).head(3)
+                        last_three = last_year_patient.sort_values(
+                            "encounter_date", ascending=False
+                        ).head(3)
                         if any(last_three["is_peds_encounter"]):
-                            results_df.loc[results_df["prw_id"] == prw_id, "meets_rule_3"] = True
+                            results_df.loc[
+                                results_df["prw_id"] == prw_id, "meets_rule_3"
+                            ] = True
+                            results_df.loc[
+                                results_df["prw_id"] == prw_id, "assignment_details"
+                            ] = "Rule 3: No well visit in 2 years AND at least 3 visits in the last 1 year AND majority with peds AND at least one of the last 3 visits was at peds"
     logging.info(f"Rule 3 assignments: {results_df['meets_rule_3'].sum()}")
-    
+
     # Process rule 4 for all patients
-    logging.info("Calculating rule 4") 
+    logging.info("Calculating rule 4")
     # Create a Series mapping prw_id to age for faster lookup
     age_map = patients_df.set_index("prw_id")["age"]
-    
+
     for i, prw_id in enumerate(patient_ids):
         # Check if patient is under 3
         if prw_id in age_map and age_map[prw_id] < 3:
             # Check for any peds appointments in last 15 months
             if prw_id in recent_by_patient:
                 recent_peds = recent_by_patient[prw_id][
-                    (recent_by_patient[prw_id]["encounter_date"] >= fifteen_months_ago) &
-                    (recent_by_patient[prw_id]["is_peds_encounter"])
+                    (recent_by_patient[prw_id]["encounter_date"] >= fifteen_months_ago)
+                    & (recent_by_patient[prw_id]["is_peds_encounter"])
                 ]
                 if len(recent_peds) == 0:
-                    results_df.loc[results_df["prw_id"] == prw_id, "should_remove_rule_4"] = True
+                    results_df.loc[
+                        results_df["prw_id"] == prw_id, "should_remove_rule_4"
+                    ] = True
     logging.info(f"Rule 4 removals: {results_df['should_remove_rule_4'].sum()}")
-    
+
     # Combine all rules to get final empaneled patients
     results_df["should_empanel"] = (
-        (results_df["meets_rule_1"] | results_df["meets_rule_2"] | results_df["meets_rule_3"]) & 
-        ~results_df["should_remove_rule_4"]
-    )
-    
+        results_df["meets_rule_1"]
+        | results_df["meets_rule_2"]
+        | results_df["meets_rule_3"]
+    ) & ~results_df["should_remove_rule_4"]
+
     # Get list of empaneled patients
     empaneled_patients = results_df[results_df["should_empanel"]]["prw_id"].tolist()
 
@@ -285,11 +324,19 @@ def transform_add_peds_panels(src: SrcData):
     mask = src.patients_df["prw_id"].isin(empaneled_patients)
     src.patients_df.loc[mask, "panel_location"] = "Palouse Pediatrics"
 
+    # Copy assignment details for empaneled patients
+    details_df = results_df[results_df["should_empanel"]][
+        ["prw_id", "assignment_details"]
+    ]
+    src.patients_df = src.patients_df.drop("assignment_details", axis=1).merge(
+        details_df, on="prw_id", how="left"
+    )
+
     logging.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
     print(
         "\nData Sample:\n-----------------------------------------------------------------------------------\n",
         src.patients_df[src.patients_df["panel_location"].notna()][
-            ["prw_id", "panel_location", "panel_provider"]
+            ["prw_id", "panel_location", "panel_provider", "assignment_details"]
         ].head(),
         "\n-----------------------------------------------------------------------------------\n",
     )
@@ -351,6 +398,9 @@ def transform_add_other_panels(src: SrcData):
     single_provider_assignments = provider_counts[
         provider_counts["prw_id"].isin(single_provider_patients["prw_id"])
     ][["prw_id", "service_provider"]]
+    single_provider_assignments["assignment_details"] = (
+        "1st cut: Patients who have seen only one provider"
+    )
 
     # 2nd Cut: Patients with a majority provider
     multi_provider_patients = patient_provider_counts[
@@ -376,6 +426,9 @@ def transform_add_other_panels(src: SrcData):
     majority_assignments_df = pd.DataFrame(
         majority_assignments, columns=["prw_id", "service_provider"]
     )
+    majority_assignments_df["assignment_details"] = (
+        "2nd cut: Patients with a majority provider"
+    )
     logging.info(f"2nd cut assignments: {len(majority_assignments_df)}")
 
     # 3rd Cut: Assign to provider of last well visit for remaining patients
@@ -394,6 +447,9 @@ def transform_add_other_panels(src: SrcData):
     last_well_assignments = (
         well_visits.groupby("prw_id").first()[["service_provider"]].reset_index()
     )
+    last_well_assignments["assignment_details"] = (
+        "3rd cut: Assign to provider of last well visit"
+    )
     logging.info(f"3rd cut assignments: {len(last_well_assignments)}")
 
     # 4th Cut: Assign remaining patients to last provider seen
@@ -409,6 +465,9 @@ def transform_add_other_panels(src: SrcData):
         .groupby("prw_id")
         .first()[["service_provider"]]
         .reset_index()
+    )
+    last_provider_seen["assignment_details"] = (
+        "4th cut: Assign remaining patients to last provider seen"
     )
     logging.info(f"4th cut assignments: {len(last_provider_seen)}")
 
@@ -437,11 +496,15 @@ def transform_add_other_panels(src: SrcData):
     src.patients_df.loc[unassigned_mask, "panel_location"] = src.patients_df.loc[
         unassigned_mask, "panel_provider"
     ].map(PROVIDER_TO_LOCATION)
+    src.patients_df.loc[unassigned_mask, "assignment_details"] = all_assignments.loc[
+        unassigned_mask, "assignment_details"
+    ]
 
     print(
         "\nData Sample:\n-----------------------------------------------------------------------------------\n",
         src.patients_df.loc[
-            unassigned_mask, ["prw_id", "panel_location", "panel_provider"]
+            unassigned_mask,
+            ["prw_id", "panel_location", "panel_provider", "assignment_details"],
         ].head(),
         "\n-----------------------------------------------------------------------------------\n",
     )
@@ -453,7 +516,7 @@ def keep_panel_data(src: SrcData) -> OutData:
     """
     return OutData(
         patients_panels_df=src.patients_df[
-            ["prw_id", "panel_location", "panel_provider"]
+            ["prw_id", "panel_location", "panel_provider", "assignment_details"]
         ]
     )
 
@@ -492,9 +555,11 @@ def main():
         src.patients_df["panel_provider"] = pd.NA
     if "panel_location" not in src.patients_df.columns:
         src.patients_df["panel_location"] = pd.NA
+    if "assignment_details" not in src.patients_df.columns:
+        src.patients_df["assignment_details"] = pd.NA
 
     # Transform data
-    transform_filter_completed_encounters(src)
+    transform_filter_encounters(src)
     transform_add_peds_panels(src)
     transform_add_other_panels(src)
     out = keep_panel_data(src)

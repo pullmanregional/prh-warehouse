@@ -497,7 +497,7 @@ def transform_add_other_panels(src: SrcData):
         unassigned_mask, "panel_provider"
     ].map(PROVIDER_TO_LOCATION)
     src.patients_df.loc[unassigned_mask, "assignment_details"] = all_assignments.loc[
-        unassigned_mask, "assignment_details"
+        unassigned_mask, "assignment_details_new"
     ]
 
     print(

@@ -207,7 +207,7 @@ def transform_add_peds_panels(src: SrcData):
     results_df["meets_rule_1"] = False
     results_df["meets_rule_2"] = False
     results_df["meets_rule_3"] = False
-    results_df["should_remove_rule_4"] = False
+    results_df["should_exclude_rule_4"] = False
     assigned_ids = set()
 
     # Group encounters by patient for efficient processing
@@ -314,16 +314,16 @@ def transform_add_peds_panels(src: SrcData):
                 ]
                 if len(recent_peds) == 0:
                     results_df.loc[
-                        results_df["prw_id"] == prw_id, "should_remove_rule_4"
+                        results_df["prw_id"] == prw_id, "should_exclude_rule_4"
                     ] = True
-    logging.info(f"Rule 4 removals: {results_df['should_remove_rule_4'].sum()}")
+    logging.info(f"Rule 4 exclusions: {results_df['should_exclude_rule_4'].sum()}")
 
     # Combine all rules to get final empaneled patients
     results_df["should_empanel"] = (
         results_df["meets_rule_1"]
         | results_df["meets_rule_2"]
         | results_df["meets_rule_3"]
-    ) & ~results_df["should_remove_rule_4"]
+    ) & ~results_df["should_exclude_rule_4"]
 
     # Get list of empaneled patients
     empaneled_patients = results_df[results_df["should_empanel"]]["prw_id"].tolist()

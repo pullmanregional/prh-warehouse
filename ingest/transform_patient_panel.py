@@ -208,6 +208,7 @@ def transform_add_peds_panels(src: SrcData):
     results_df["meets_rule_2"] = False
     results_df["meets_rule_3"] = False
     results_df["should_remove_rule_4"] = False
+    assigned_ids = set()
 
     # Group encounters by patient for efficient processing
     recent_by_patient = dict(list(recent_encounters.groupby("prw_id")))
@@ -231,11 +232,14 @@ def transform_add_peds_panels(src: SrcData):
                     results_df.loc[
                         results_df["prw_id"] == prw_id, "assignment_details"
                     ] = "Rule 1: At least 3 visits in the last 2 years, and the last 3 were at peds"
+                    assigned_ids.add(prw_id)
     logging.info(f"Rule 1 assignments: {results_df['meets_rule_1'].sum()}")
 
     # Process rule 2 for all patients
     logging.info("Calculating rule 2")
     for i, prw_id in enumerate(patient_ids):
+        if prw_id in assigned_ids:
+            continue
         if prw_id in recent_by_patient:
             patient_encounters = recent_by_patient[prw_id]
             # Get well visits
@@ -259,11 +263,14 @@ def transform_add_peds_panels(src: SrcData):
                         results_df.loc[
                             results_df["prw_id"] == prw_id, "assignment_details"
                         ] = "Rule 2: Last well visit was in the last 2 years AND it was at peds AND at least one of the last 3 visits was at peds"
+                        assigned_ids.add(prw_id)
     logging.info(f"Rule 2 assignments: {results_df['meets_rule_2'].sum()}")
 
     # Process rule 3 for all patients
     logging.info("Calculating rule 3")
     for i, prw_id in enumerate(patient_ids):
+        if prw_id in assigned_ids:
+            continue
         if prw_id in recent_by_patient and prw_id in last_year_by_patient:
             recent_patient = recent_by_patient[prw_id]
             last_year_patient = last_year_by_patient[prw_id]
@@ -288,6 +295,7 @@ def transform_add_peds_panels(src: SrcData):
                             results_df.loc[
                                 results_df["prw_id"] == prw_id, "assignment_details"
                             ] = "Rule 3: No well visit in 2 years AND at least 3 visits in the last 1 year AND majority with peds AND at least one of the last 3 visits was at peds"
+                            assigned_ids.add(prw_id)
     logging.info(f"Rule 3 assignments: {results_df['meets_rule_3'].sum()}")
 
     # Process rule 4 for all patients

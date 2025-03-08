@@ -225,21 +225,20 @@ def calc_patient_age(patients_df: pd.DataFrame):
 
     # Convert dob from YYYYMMDD int to datetime
     dob_df = pd.to_datetime(patients_df["dob"].astype(str), format="%Y%m%d")
-    
+
     # Calculate age in years
     # Adjust by 1 year if birthday hasn't occurred this year
-    patients_df["age"] = (now.year - dob_df.dt.year)
+    patients_df["age"] = now.year - dob_df.dt.year
     mask = (now.month < dob_df.dt.month) | (
-        (now.month == dob_df.dt.month) & 
-        (now.day < dob_df.dt.day)
+        (now.month == dob_df.dt.month) & (now.day < dob_df.dt.day)
     )
     patients_df.loc[mask, "age"] -= 1
 
     # Calculate age in months, but only retain if under 3
     patients_df["age_in_mo_under_3"] = (
-        (now.year - dob_df.dt.year) * 12 +
-        (now.month - dob_df.dt.month) -
-        (now.day < dob_df.dt.day)
+        (now.year - dob_df.dt.year) * 12
+        + (now.month - dob_df.dt.month)
+        - (now.day < dob_df.dt.day)
     )
     patients_df.loc[patients_df["age"] > 2, "age_in_mo_under_3"] = None
     patients_df["age_in_mo_under_3"] = patients_df["age_in_mo_under_3"].astype("Int64")
@@ -259,25 +258,33 @@ def calc_age_at_encounter(encounters_df: pd.DataFrame, patients_df: pd.DataFrame
     # Convert dob and encounter_date from YYYYMMDD int to datetime
     dates_df = pd.DataFrame()
     dates_df["dob"] = pd.to_datetime(encounters_df["dob"].astype(str), format="%Y%m%d")
-    dates_df["encounter_date"] = pd.to_datetime(encounters_df["encounter_date"].astype(str), format="%Y%m%d")
+    dates_df["encounter_date"] = pd.to_datetime(
+        encounters_df["encounter_date"].astype(str), format="%Y%m%d"
+    )
 
     # Calculate age of patient at encounter in years (if under 3)
     # Adjust by 1 year if birthday hasn't occurred in encounter year
-    encounters_df["encounter_age"] = (dates_df["encounter_date"].dt.year - dates_df["dob"].dt.year)
+    encounters_df["encounter_age"] = (
+        dates_df["encounter_date"].dt.year - dates_df["dob"].dt.year
+    )
     mask = (dates_df["encounter_date"].dt.month < dates_df["dob"].dt.month) | (
-        (dates_df["encounter_date"].dt.month == dates_df["dob"].dt.month) & 
-        (dates_df["encounter_date"].dt.day < dates_df["dob"].dt.day)
+        (dates_df["encounter_date"].dt.month == dates_df["dob"].dt.month)
+        & (dates_df["encounter_date"].dt.day < dates_df["dob"].dt.day)
     )
     encounters_df.loc[mask, "encounter_age"] -= 1
 
     # Calculate age in months, but only retain if under 3
     encounters_df["encounter_age_in_mo_under_3"] = (
-        (dates_df["encounter_date"].dt.year - dates_df["dob"].dt.year) * 12 +
-        (dates_df["encounter_date"].dt.month - dates_df["dob"].dt.month) -
-        (dates_df["encounter_date"].dt.day < dates_df["dob"].dt.day)
+        (dates_df["encounter_date"].dt.year - dates_df["dob"].dt.year) * 12
+        + (dates_df["encounter_date"].dt.month - dates_df["dob"].dt.month)
+        - (dates_df["encounter_date"].dt.day < dates_df["dob"].dt.day)
     )
-    encounters_df.loc[encounters_df["encounter_age"] > 2, "encounter_age_in_mo_under_3"] = None
-    encounters_df["encounter_age_in_mo_under_3"] = encounters_df["encounter_age_in_mo_under_3"].astype("Int64")
+    encounters_df.loc[
+        encounters_df["encounter_age"] > 2, "encounter_age_in_mo_under_3"
+    ] = None
+    encounters_df["encounter_age_in_mo_under_3"] = encounters_df[
+        "encounter_age_in_mo_under_3"
+    ].astype("Int64")
 
     return encounters_df
 
@@ -292,13 +299,15 @@ def partition_phi(patients_df: pd.DataFrame):
         "name",
         "dob",
         "address",
-        "city",
-        "state",
         "zip",
         "phone",
         "email",
     ]
-    id_details_df = patients_df[["prw_id"] + PHI_COLUMNS]
+    LOCATION_COLUMNS = [
+        "city",
+        "state",
+    ]
+    id_details_df = patients_df[["prw_id"] + PHI_COLUMNS + LOCATION_COLUMNS]
 
     # Remove PHI columns from main dataset
     patients_df = patients_df.drop(columns=PHI_COLUMNS).copy()
@@ -361,7 +370,9 @@ def main():
             logging.info("ID DB table does not exist, will generate new ID mappings")
 
     # Read source file into memory
-    patients_df, encounters_df, mrn_to_prw_id_df = read_encounters(encounters_file, mrn_to_prw_id_df)
+    patients_df, encounters_df, mrn_to_prw_id_df = read_encounters(
+        encounters_file, mrn_to_prw_id_df
+    )
     mychart_df = read_mychart_status(mychart_file, mrn_to_prw_id_df)
 
     # Transform data only to partition PHI into separate DB. All other data
@@ -382,7 +393,7 @@ def main():
         logging.info("Dropping existing tables")
         prw_model.PrwMetaModel.metadata.drop_all(prw_engine)
         prw_model.PrwModel.metadata.drop_all(prw_engine)
-    
+
     logging.info("Creating tables")
     prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)

@@ -46,7 +46,8 @@ INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
 # TODO: Move this to a Prefect block where deployments are registered in prw_deploy.py
 DATAMART_DEPLOYMENTS = [
     "prw-datamart-finance-dash/prh-dash-ingest",
-    "prw-datamart-marketing/prw-datamart-marketing"
+    "prw-datamart-marketing/prw-datamart-marketing",
+    "prw-datamart-panel/prw-datamart-panel"
 ]
 
 

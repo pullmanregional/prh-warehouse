@@ -65,14 +65,7 @@ PEDS_LOCATIONS = [
     "CC WPL PALOUSE PEDIATRICS MOSCOW",
 ]
 PROVIDER_TO_LOCATION = {
-    # Palouse Pediatrics
-    "FROSTAD, MICHAEL": "Palouse Pediatrics",
-    "GORDON, METHUEL": "Palouse Pediatrics",
-    "HRYNIEWICZ, KATHRYN": "Palouse Pediatrics",
-    "LEE, JONATHAN": "Palouse Pediatrics",
-    "LEE, JONATHAN J": "Palouse Pediatrics",
-    "RINALDI, MACKENZIE CLAIRE": "Palouse Pediatrics",
-    "SHIELDS, MARICARMEN": "Palouse Pediatrics",
+    # Palouse Pediatrics - empanelment via transform_add_peds_panels(), do not process in this map
     # Pullman Family Medicine
     "ADKINS, BENJAMIN J": "Pullman Family Medicine",
     "BRODSKY, KAZ B": "Pullman Family Medicine",

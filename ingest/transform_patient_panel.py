@@ -128,7 +128,7 @@ WELL_DX_STRINGS = [
     "well exam",
     "wellness exam",
 ]
-WELL_DX_REGEX = "|".join(f"[{code}]" for code in WELL_DX_STRINGS)
+WELL_DX_REGEX = "|".join(f"{code}" for code in WELL_DX_STRINGS)
 
 
 def transform_filter_encounters(src: SrcData):

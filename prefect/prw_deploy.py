@@ -78,6 +78,8 @@ if __name__ == "__main__":
         entrypoint="reports/prefect/flow.py:prh_reports",
     ).deploy(
         name="prh-reports",
+        # Daily at 7:00 AM
+        schedule=Schedule(cron="0 7 * * *", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )
 

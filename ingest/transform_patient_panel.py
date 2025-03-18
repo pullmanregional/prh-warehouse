@@ -120,6 +120,7 @@ WELL_DX_STRINGS = [
     "annual wellness",
     "well exam",
     "wellness exam",
+    "preventative health care",
 ]
 WELL_DX_REGEX = "|".join(f"{code}" for code in WELL_DX_STRINGS)
 

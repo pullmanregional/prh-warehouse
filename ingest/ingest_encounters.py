@@ -85,6 +85,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
             "with_pcp",
             "appt_status",
             "diagnoses",
+            "diagnoses_icd",
             "level_of_service",
             "level_of_service_name",
         ],
@@ -108,6 +109,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
             "with_pcp": "Int8",
             "appt_status": str,
             "diagnoses": str,
+            "diagnoses_icd": str,
             "level_of_service": str,
             "level_of_service_name": str,
         },
@@ -141,6 +143,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
             "with_pcp",
             "appt_status",
             "diagnoses",
+            "diagnoses_icd",
             "level_of_service",
         ]
     ].copy()

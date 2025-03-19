@@ -1,6 +1,3 @@
 [submodule "ingest/prw_common"]
 	path = ingest/prw_common
 	url = https://github.com/pullmanregional/prw_common.git
-[submodule "prw-exporter"]
-	path = prw-exporter
-	url = https://github.com/pullmanregional/prw-exporter.git

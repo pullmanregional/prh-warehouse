@@ -110,19 +110,8 @@ WELL_ENCOUNTER_TYPES = [
     "CC SPORTS PHYSICAL",
     "CC FAA PHYSICAL",
 ]
-WELL_DX_STRINGS = [
-    "well baby",
-    "well child",
-    "well adolescent",
-    "well woman",
-    "well man",
-    "wellness visit",
-    "annual wellness",
-    "well exam",
-    "wellness exam",
-    "preventative health care",
-]
-WELL_DX_REGEX = "|".join(f"{code}" for code in WELL_DX_STRINGS)
+WELL_DX_ICD_STRINGS = ["Z00.", "Z02."]
+WELL_DX_REGEX = "|".join(f"{code}" for code in WELL_DX_ICD_STRINGS)
 
 
 def transform_filter_encounters(src: SrcData):
@@ -169,7 +158,7 @@ def transform_add_peds_panels(src: SrcData):
     # Mark well visits by visit type or diagnoses
     encounters_df["is_well_visit"] = encounters_df["encounter_type"].isin(
         WELL_ENCOUNTER_TYPES
-    ) | encounters_df["diagnoses"].str.match(WELL_DX_REGEX, case=False)
+    ) | encounters_df["diagnoses_icd"].str.match(WELL_DX_REGEX, case=False)
 
     # ------------------------------------------------
     # Empanel by location:
@@ -442,7 +431,7 @@ def transform_add_other_panels(src: SrcData):
         recent_encounters["prw_id"].isin(patients_after_2nd_cut["prw_id"])
         & (
             recent_encounters["encounter_type"].isin(WELL_ENCOUNTER_TYPES)
-            | recent_encounters["diagnoses"].str.match(WELL_DX_REGEX, case=False)
+            | recent_encounters["diagnoses_icd"].str.match(WELL_DX_REGEX, case=False)
         )
     ].sort_values("encounter_date", ascending=False)
 

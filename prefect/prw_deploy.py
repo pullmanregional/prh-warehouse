@@ -66,7 +66,6 @@ if __name__ == "__main__":
         work_pool_name="ingest",
     )
 
-
     # SQL reports
     prw_exporter_repo = GitRepository(
         url="https://github.com/pullmanregional/prw-exporter.git",
@@ -120,7 +119,7 @@ if __name__ == "__main__":
         entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
     ).deploy(
         name="prh-dash-ingest",
-        # Every hour, between 07:00 AM and 06:00 PM every day
-        schedule=Schedule(cron="0 7-18 * * *", timezone="America/Los_Angeles"),
+        # Daily at 8:00 AM
+        schedule=Schedule(cron="0 8 * * *", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )

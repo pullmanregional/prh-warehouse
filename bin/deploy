@@ -1,4 +1,5 @@
 #!/bin/bash
 PRW_ENV=prod
 cd prefect
-pipenv run prefect profile use ephemeral && pipenv run python prw_deploy.py
+PIPENV_IGNORE_VIRTUALENVS=1 pipenv run prefect profile use ephemeral
+PIPENV_IGNORE_VIRTUALENVS=1 pipenv run python prw_deploy.py

@@ -34,15 +34,6 @@ if __name__ == "__main__":
     # Datamart flows
     # These flows are triggered by name by prw_ingest.py
     # ------------------------------------------------------------------
-    # Finance dashboard
-    flow.from_source(
-        source="https://github.com/jonjlee-streamlit/prh-dash.git",
-        entrypoint="prefect/flow.py:prh_datamart_finance",
-    ).deploy(
-        name="prw-datamart-finance",
-        work_pool_name="ingest",
-    )
-
     # Marketing dashboard
     prh_streamlit_repo = GitRepository(
         url="https://github.com/pullmanregional/streamlit.git",
@@ -63,6 +54,15 @@ if __name__ == "__main__":
         entrypoint="panel/prefect/flow.py:prw_datamart_panel",
     ).deploy(
         name="prw-datamart-panel",
+        work_pool_name="ingest",
+    )
+
+    # Finance dashboard
+    flow.from_source(
+        source=prh_streamlit_repo,
+        entrypoint="finance/prefect/flow.py:prw_datamart_finance",
+    ).deploy(
+        name="prw-datamart-finance",
         work_pool_name="ingest",
     )
 
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     ).deploy(
         name="prh-sources-epic",
         # At 2:00 AM every day
-        schedule=Schedule(cron="0 2 * * *", timezone="America/Los_Angeles"),
+        schedule=Schedule(cron="0 3 * * *", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )
 
@@ -110,16 +110,5 @@ if __name__ == "__main__":
         name="clinic-cal-epic-ingest",
         # Every hour, between 07:00 AM and 06:00 PM, Monday through Friday
         schedule=Schedule(cron="0 7-18 * * 1-5", timezone="America/Los_Angeles"),
-        work_pool_name="ingest",
-    )
-
-    # Financial dashboard data
-    flow.from_source(
-        source="https://github.com/jonjlee-streamlit/prh-dash.git",
-        entrypoint="prefect/prh-dash-ingest.py:prh_dash_ingest",
-    ).deploy(
-        name="prh-dash-ingest",
-        # Daily at 8:00 AM
-        schedule=Schedule(cron="0 8 * * *", timezone="America/Los_Angeles"),
         work_pool_name="ingest",
     )

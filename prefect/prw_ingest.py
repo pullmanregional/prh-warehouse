@@ -1,5 +1,5 @@
 """
-Main ingest workflow for the PRH data warehouse. This flow orchestrates the ingestion of data from various 
+Main ingest workflow for the PRH data warehouse. This flow orchestrates the ingestion of data from various
 source systems into the warehouse.
 
 The flow is deployed and scheduled via Prefect (see prw_deploy.py). It:
@@ -30,7 +30,9 @@ from ingest.prw_common.env_utils import load_prw_env
 PRW_ENV = load_prw_env(__file__)
 
 # Update path to include pipenv in the worker user's local bin or .pyenv shims
-os.environ["PATH"] = f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.pyenv/shims/"
+os.environ["PATH"] = (
+    f"{os.environ['PATH']}:{pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.pyenv/shims/"
+)
 
 # Load config from env vars into constants
 PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
@@ -45,9 +47,9 @@ INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
 # Format flows as "deployment-name/flow-name"
 # TODO: Move this to a Prefect block where deployments are registered in prw_deploy.py
 DATAMART_DEPLOYMENTS = [
-    "prw-datamart-finance-dash/prh-dash-ingest",
     "prw-datamart-marketing/prw-datamart-marketing",
-    "prw-datamart-panel/prw-datamart-panel"
+    "prw-datamart-panel/prw-datamart-panel",
+    "prw-datamart-finance/prw-datamart-finance",
 ]
 
 
@@ -101,17 +103,21 @@ async def datamart_ingest():
 # -----------------------------------------
 # Main entry point / parent flow
 # -----------------------------------------
-@flow(name="prw-ingest" + f".{PRW_ENV}" if PRW_ENV != "prod" else "", retries=0, retry_delay_seconds=300)
+@flow(
+    name="prw-ingest" + f".{PRW_ENV}" if PRW_ENV != "prod" else "",
+    retries=0,
+    retry_delay_seconds=300,
+)
 async def prw_ingest(
     run_ingest=True, run_transform=True, run_datamart=True, drop_tables=False
 ):
     # First, create/update the python virtual environment which is used by all subflows in ../ingest/
-    # The PIPENV_IGNORE_VIRTUALENVS env var instructs pipenv to install dependencies from the Pipfile 
+    # The PIPENV_IGNORE_VIRTUALENVS env var instructs pipenv to install dependencies from the Pipfile
     # in the current directory (../ingest) into the current venv (prefect-prh-warehouse).
     await shell_op(
         command="env; pipenv install",
         env={"PIPENV_IGNORE_VIRTUALENVS": "1"},
-        cwd=INGEST_CODE_ROOT
+        cwd=INGEST_CODE_ROOT,
     )
 
     if run_ingest:

@@ -13,69 +13,136 @@ PAY_PERIOD_ANCHOR_DATE = {
 }
 
 
-def read_volume_and_uos_data(filename, sheet):
+def _process_volume_and_uos_table(df, year, dept_id_to_unit):
     """
-    Read the Excel sheet with volume data into a dataframe
+    Read volume and UOS data from single table in Dashboard Supporting Data
+    and unpivot data from a table like:
+
+                2022
+                                           Jan  Feb ....
+        CC_60100   INTENSIVE CARE UNIT      62   44
+
+    to format we can store to DB:
+
+        Month     DeptID    DeptName              Volume
+        2022-01   CC_60100  INTENSIVE CARE UNIT   62
+
     """
-    # Read tables from excel worksheet
-    logging.info(f"Reading {filename}, {sheet}")
-    xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
-    volumes_by_year = pandas_utils.df_get_tables_by_columns(xl_data, "1:70")
-
-    # Convert from multiple tables:
-    #            2022
-    #                                    Jan  Feb ....
-    # CC_60100   INTENSIVE CARE UNIT      62   44
-    #
-    # to format we can store to DB:
-    #
-    # Month     DeptID    DeptName              Volume
-    # 2022-01   CC_60100  INTENSIVE CARE UNIT   62
-    # ...
-
-    # Store map of dept ID to volume unit, which is in column C of the first table
-    tbl = volumes_by_year[0]
-    dept_id_to_unit = {row[0]: row[2] for row in tbl.itertuples(index=False)}
-
+    # Pull volume data from each row
     data = []
-    for df in volumes_by_year:
-        # The first table has an extra column for the volume units (eg Patient Days or Tests). The remainder do not.
-        # Look for year in row 2, column 3. If it's not there, then we have an extra column
-        year_row, year_col = 0, 2
-        col_offset = 0 if pd.notna(df.iloc[year_row, year_col]) else 1
-        year = df.iloc[year_row, year_col + col_offset]
-        assert pd.notna(year)
+    for _index, row in df.iterrows():
+        # Dept ID and name in the A:B
+        dept_wd_id = row.iloc[0]
+        dept_name = row.iloc[1]
 
-        # Skip header rows x 2 with year and month names
-        df = df.iloc[2:]
+        # Volume unit for this dept
+        unit = dept_id_to_unit.get(dept_wd_id, None)
 
-        # Pull volume data from each row
-        for _index, row in df.iterrows():
-            # Dept ID and name in the A:B
-            dept_wd_id = row.iloc[0]
-            dept_name = row.iloc[1]
-
-            # Volume unit for this dept
-            unit = dept_id_to_unit.get(dept_wd_id, None)
-
-            # Iterate over volume numbers in columns C:N. enumerate(..., start=1) results in month = [1..12]
-            # Most tables have two non-data columns preceding data. col_offset above gives us the number of
-            # extra non-data columns in this table
-            volumes = row.iloc[2 + col_offset : 2 + col_offset + 12]
-            for month_num, volume in enumerate(volumes, start=1):
-                if pd.notnull(volume):
-                    # Format month column like "2022-01"
-                    month = f"{year:04d}-{month_num:02d}"
-                    data.append([dept_wd_id, dept_name, month, volume, unit])
+        # Iterate over volume numbers in columns C:N. enumerate(..., start=1) results in month = [1..12]
+        volumes = row.iloc[2 : (2 + 12)]
+        for month_num, volume in enumerate(volumes, start=1):
+            if pd.notnull(volume):
+                # Format month column like "2022-01"
+                month = f"{year:04d}-{month_num:02d}"
+                data.append([dept_wd_id, dept_name, month, volume, unit])
 
     return pd.DataFrame(
         data, columns=["dept_wd_id", "dept_name", "month", "volume", "unit"]
     )
 
 
-def read_budget_data(filename, budget_sheet, hrs_per_volume_sheet, uos_sheet):
+def read_historical_volume_and_uos_data(filename, sheet):
     """
-    Read the sheet from the Dashboard Supporting Data Excel workbook with budgeted hours and volume data into a dataframe
+    Read volume and UOS data from historical Dashboard Supporting Data format
+    where there is a year number in the first row and one table per year
+    """
+    # Read tables from excel worksheet
+    logging.info(f"Reading historical data from {filename}, {sheet}")
+    xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
+    volumes_by_year = pandas_utils.df_get_tables_by_columns(xl_data, "1:70")
+
+    # Store map of dept ID to volume unit, which is in column C of the first table
+    tbl = volumes_by_year[0]
+    dept_id_to_unit = {row[0]: row[2] for row in tbl.itertuples(index=False)}
+
+    # Process each year's table and combine the results
+    all_data = []
+    for idx, df in enumerate(volumes_by_year):
+        # The first table has an extra column for the volume units (eg Patient Days or Tests). The remainder do not.
+        if idx == 0:
+            df = df.drop(df.columns[2], axis=1)
+
+        # Get the year from the table
+        year_row, year_col = 0, 2
+        col_offset = 0 if pd.notna(df.iloc[year_row, year_col]) else 1
+        year = df.iloc[year_row, year_col + col_offset]
+        assert pd.notna(year)
+
+        # Skip header rows x 2 with year and month names
+        df_data = df.iloc[2:]
+
+        # Process this year's table
+        year_data = _process_volume_and_uos_table(df_data, year, dept_id_to_unit)
+        all_data.append(year_data)
+
+    return pd.concat(all_data)
+
+
+def read_volume_and_uos_data(year, filename, sheet):
+    """
+    Read the Excel sheet with volume data into a dataframe
+    """
+    # Read tables from excel worksheet
+    logging.info(f"Reading {filename}, {sheet}")
+    xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
+    df = pandas_utils.df_get_table(xl_data, "A1", has_header_row=True)
+
+    # Store map of dept ID to volume unit, which is in column C of the table, and drop column C
+    dept_id_to_unit = {row[0]: row[2] for row in df.itertuples(index=False)}
+    df = df.drop(df.columns[2], axis=1)
+
+    # Process the single year table
+    return _process_volume_and_uos_table(df, year, dept_id_to_unit)
+
+
+def _process_budget_table(df):
+    """
+    Extract data from the budget table from the Dashboard Supporting Data Excel workbook
+    """
+    # Drop columns without an Workday ID
+    df.dropna(subset=["dept_wd_id"], inplace=True)
+
+    # Interpret NaN as 0 budgeted fte, hours, volume and hrs/volume
+    df["budget_fte"] = df["budget_fte"].fillna(0)
+    df["budget_prod_hrs"] = df["budget_prod_hrs"].fillna(0)
+    df["budget_contracted_hours"] = df["budget_contracted_hours"].fillna(0)
+    df["budget_volume"] = df["budget_volume"].fillna(0)
+    df["budget_uos"] = df["budget_uos"].fillna(0)
+    df["budget_prod_hrs_per_uos"] = df["budget_prod_hrs_per_uos"].fillna(0)
+    df["hourly_rate"] = df["hourly_rate"].fillna(0)
+
+    return df[
+        [
+            "dept_wd_id",
+            "dept_name",
+            "year",
+            "budget_fte",
+            "budget_prod_hrs",
+            "budget_contracted_hours",
+            "budget_volume",
+            "budget_uos",
+            "budget_prod_hrs_per_uos",
+            "hourly_rate",
+        ]
+    ]
+
+
+def read_historical_budget_data(
+    year, filename, budget_sheet, hrs_per_volume_sheet, uos_sheet
+):
+    """
+    Read the sheet from historical Dashboard Supporting Data Excel workbook with budgeted hours and volume data
+    For historical data, budgets for hours/volume and uos are just based on prior year data
     """
     # Extract table and assign column names that match DB schema for columns we will retain
     logging.info(f"Reading {filename}, {budget_sheet}")
@@ -97,6 +164,9 @@ def read_budget_data(filename, budget_sheet, hrs_per_volume_sheet, uos_sheet):
         "Current YTD FTE",
     ]
 
+    # Add year column
+    budget_df["year"] = year
+
     # Read goal Prod hrs / UOS from dedicated sheet
     logging.info(f"Reading {filename}, {hrs_per_volume_sheet}")
     xl_data = pd.read_excel(filename, sheet_name=hrs_per_volume_sheet, header=None)
@@ -114,53 +184,70 @@ def read_budget_data(filename, budget_sheet, hrs_per_volume_sheet, uos_sheet):
     prior_yr_uos_df = prior_yr_uos_df.iloc[:, [0, -1]]
     prior_yr_uos_df.columns = ["ID", "budget_uos"]
 
-    # Transform
-    # ---------
-    # Drop columns without an Workday ID
-    budget_df.dropna(subset=["dept_wd_id"], inplace=True)
-
     # Join volumes, budgeted hours, and UOS tables based on workday ID
     budget_df = budget_df.join(hrs_per_volume_df.set_index("ID"), on="dept_wd_id")
     budget_df = budget_df.join(prior_yr_uos_df.set_index("ID"), on="dept_wd_id")
-
-    # Interpret NaN as 0 budgeted fte, hours, volume and hrs/volume
-    budget_df["budget_fte"] = budget_df["budget_fte"].fillna(0)
-    budget_df["budget_prod_hrs"] = budget_df["budget_prod_hrs"].fillna(0)
-    budget_df["budget_volume"] = budget_df["budget_volume"].fillna(0)
-    budget_df["budget_uos"] = budget_df["budget_uos"].fillna(0)
     budget_df["budget_prod_hrs_per_uos"] = budget_df["GOAL"].fillna(0)
-    budget_df["hourly_rate"] = budget_df["hourly_rate"].fillna(0)
 
-    return budget_df[
-        [
-            "dept_wd_id",
-            "dept_name",
-            "budget_fte",
-            "budget_prod_hrs",
-            "budget_volume",
-            "budget_uos",
-            "budget_prod_hrs_per_uos",
-            "hourly_rate",
-        ]
+    # No contracted hours budget in historical data
+    budget_df["budget_contracted_hours"] = 0
+
+    return _process_budget_table(budget_df)
+
+
+def read_budget_data(filename, budget_sheet):
+    """
+    Read the sheet from Dashboard Supporting Data Excel workbook with budgeted hours and volume data
+    """
+    # Extract table and assign column names that match DB schema for columns we will retain
+    logging.info(f"Reading {filename}, {budget_sheet}")
+    xl_data = pd.read_excel(filename, sheet_name=budget_sheet, header=None)
+    budget_df = pandas_utils.df_get_tables_by_rows(
+        xl_data, cols="A:N", start_row_idx=6, limit=1
+    )
+    budget_df = budget_df[0]
+    budget_df.columns = [
+        "as_of_date",
+        "dept_wd_id",
+        "dept_name",
+        "budget_fte",
+        "Budgeted Hours",
+        "% Productive",
+        "budget_fte_prod_hrs",
+        "budget_contracted_hours",
+        "budget_prod_hrs",
+        "budget_volume",
+        "budget_uos",
+        "",
+        "hourly_rate",
+        "Current YTD FTE",
     ]
 
+    # Add year column
+    budget_df["as_of_date"] = pd.to_datetime(budget_df["as_of_date"])
+    budget_df["year"] = budget_df["as_of_date"].dt.year
 
-def read_contracted_hours_data(filename, sheet):
+    # Calculate budgeted prod hrs per unit of service
+    budget_df["budget_prod_hrs_per_uos"] = (
+        budget_df["budget_prod_hrs"] / budget_df["budget_uos"]
+    )
+
+    return _process_budget_table(budget_df)
+
+
+def read_historical_contracted_hours_data(year, filename, sheet):
     """
-    Read sheet from the Dashboard Supporting Data Excel workbook with Traveler's Hours
+    Read historical contracted hours data from the Dashboard Supporting Data Excel workbook
     """
     # Extract table
-    logging.info(f"Reading {filename}, {sheet}")
+    logging.info(f"Reading historical data from {filename}, {sheet}")
     xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
     xl_df = pandas_utils.df_get_table(xl_data, start_cell="A4", has_header_row=True)
 
     # Get the last updated month from the top of the sheet
     contracted_hours_updated_month = pandas_utils.df_get_val_or_range(xl_data, "G1")
-    contracted_hours_updated_month_df = pd.DataFrame(
-        {"contracted_hours_updated_month": [str(contracted_hours_updated_month)]}
-    )
 
-    # Rename columns, which appear in groups of 3 for eac year:
+    # Rename columns, which appear in groups of 3 for each year:
     #   YYYY PRH ProdHrs YE, YYYY Travelers YE, YYYY TOTAL
     # to:
     #   YYYY_prh, YYYY, YYYY_ttl
@@ -194,9 +281,44 @@ def read_contracted_hours_data(filename, sheet):
             }
 
     # Interpret NaN as 0 for total hours
+    df["hrs"] = df["hrs"].fillna(0)
     df["ttl_dept_hrs"] = df["ttl_dept_hrs"].fillna(0)
 
-    return contracted_hours_updated_month_df, df
+    return contracted_hours_updated_month, df
+
+
+def read_contracted_hours_data(year, filename, sheet):
+    """
+    Read sheet from the Dashboard Supporting Data Excel workbook with Traveler's Hours
+    """
+    # Extract table
+    logging.info(f"Reading {filename}, {sheet}")
+    xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
+    df = pandas_utils.df_get_table(xl_data, start_cell="A4", has_header_row=True)
+
+    df.columns = [
+        "as_of_date",
+        "dept_wd_id",
+        "dept_name",
+        "Prior Year PRH ProdHrs YE",
+        "Prior Year Travelers YE",
+        "Prior Year TOTAL",
+        "Current Year PRH ProdHrs YTD",
+        "hrs",
+        "ttl_dept_hrs",
+    ]
+
+    # Locate the last updated month in the first row of the as-of-date column
+    contracted_hours_updated_month = df["as_of_date"].iloc[0]
+
+    # Add year column
+    df["year"] = pd.to_datetime(df["as_of_date"]).dt.year
+
+    # Interpret NaN as 0 for hours
+    df["hrs"] = df["hrs"].fillna(0)
+    df["ttl_dept_hrs"] = df["ttl_dept_hrs"].fillna(0)
+
+    return contracted_hours_updated_month, df
 
 
 def read_income_stmt_data(files):

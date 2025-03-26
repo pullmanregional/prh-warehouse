@@ -87,7 +87,7 @@ def get_file_paths(base_path):
     )
 
 
-def find_volumes_files(volumes_path):
+def find_volumes_files(volumes_path, min_year):
     """
     Find the latest Dashboard Supporting Data file for each year from the DOMO directory
     """
@@ -110,7 +110,7 @@ def find_volumes_files(volumes_path):
 
     # For each year, get the latest file based on month number in the filename
     for year, files in files_by_year.items():
-        if files:
+        if int(year) >= int(min_year) and files:
             # Extract month number from filename format (MM) and sort
             def get_month_num(file):
                 month_match = re.search(r"\((\d+)\)", os.path.basename(file))
@@ -167,7 +167,7 @@ def main():
         exit(1)
 
     # Get list of dynamic data files, ie data organized as one Excel workbook per month
-    volumes_files = find_volumes_files(volumes_path)
+    volumes_files = find_volumes_files(volumes_path, HISTORICAL_VOLUMES_YEAR + 1)
     income_stmt_files = util.find_data_files(income_stmt_path)
     hours_files = util.find_data_files(hours_path, exclude=[historical_hours_file])
     source_files = (

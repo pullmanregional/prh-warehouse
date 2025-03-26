@@ -19,9 +19,26 @@
       "program": "ingest_encounters.py",
       "cwd": "${workspaceFolder}/ingest",
       "args": [
-        "-i", "./data/epic",
-        "--prw", "${input:prwConnectionString}",
-        "--prwid", "${input:prwConnectionString}"
+        "-i",
+        "./data/epic",
+        "--prw",
+        "${input:prwConnectionString}",
+        "--prwid",
+        "${input:prwConnectionString}"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Ingest Finance (from ./data/)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "ingest_finance.py",
+      "cwd": "${workspaceFolder}/ingest",
+      "args": [
+        "-i",
+        "./data/finance",
+        "--prw",
+        "${input:prwConnectionString}",
       ],
       "console": "integratedTerminal"
     },
@@ -32,7 +49,8 @@
       "program": "transform_patient_panel.py",
       "cwd": "${workspaceFolder}/ingest",
       "args": [
-        "--prw", "${input:prwConnectionString}",
+        "--prw",
+        "${input:prwConnectionString}",
       ],
       "console": "integratedTerminal"
     }

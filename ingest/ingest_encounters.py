@@ -2,6 +2,7 @@ import os
 import logging
 import warnings
 import pandas as pd
+import json
 from typing import List
 from datetime import datetime
 from sqlmodel import Session, select, inspect
@@ -30,7 +31,7 @@ logging.basicConfig(level=logging.INFO)
 # -------------------------------------------------------
 # Extract from Source Files
 # -------------------------------------------------------
-def sanity_check_files(encounters_file, mychart_file):
+def sanity_check_files(encounters_file, mychart_file, allergy_file):
     """
     Executed once at the beginning of ingest to validate CSV file
     meets basic requirements.
@@ -40,6 +41,8 @@ def sanity_check_files(encounters_file, mychart_file):
         error = f"ERROR: encounters file does not exist: {encounters_file}"
     elif not os.path.isfile(mychart_file):
         error = f"ERROR: mychart file does not exist: {mychart_file}"
+    elif not os.path.isfile(allergy_file):
+        error = f"ERROR: allergy file does not exist: {allergy_file}"
     if error is not None:
         print(error)
 
@@ -188,6 +191,40 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     encounters_df.drop(columns=["mrn"], inplace=True)
 
     return patients_df, encounters_df, mrn_to_prw_id_df
+
+
+def read_allergy(allergy_file: str, mrn_to_prw_id_df: pd.DataFrame):
+    """
+    Read allergy file and add info into patients_df
+    """
+    logging.info(f"Reading {allergy_file}")
+    allergy_df = pd.read_csv(
+        allergy_file,
+        skiprows=1,
+        index_col=False,
+        names=[
+            "mrn",
+            "allergen_key",
+            "name",
+            "reaction",
+            "type",
+            "severity",
+        ],
+    )
+
+    # Group by MRN, and merge the name, reaction, type, and severity into an object, then convert to json string
+    allergy_df["mrn"] = allergy_df["mrn"].astype(str)
+    allergy_df = (
+        allergy_df.groupby("mrn")[["name", "reaction", "type", "severity"]]
+        .apply(lambda x: x.to_json(orient="records"))
+        .reset_index(name="allergy")
+    )
+
+    # Convert MRN to prw_id
+    allergy_df = allergy_df.merge(mrn_to_prw_id_df, on="mrn", how="right")
+    allergy_df.drop(columns=["mrn"], inplace=True)
+
+    return allergy_df
 
 
 def read_mychart_status(mychart_file: str, mrn_to_prw_id_df: pd.DataFrame):
@@ -353,9 +390,10 @@ def main():
     # Input files
     encounters_file = os.path.join(in_path, "encounters.csv")
     mychart_file = os.path.join(in_path, "mychart.csv")
+    allergy_file = os.path.join(in_path, "allergy.csv")
 
     # Sanity check the input file
-    if not sanity_check_files(encounters_file, mychart_file):
+    if not sanity_check_files(encounters_file, mychart_file, allergy_file):
         logging.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
@@ -377,6 +415,10 @@ def main():
         encounters_file, mrn_to_prw_id_df
     )
     mychart_df = read_mychart_status(mychart_file, mrn_to_prw_id_df)
+    allergy_df = read_allergy(allergy_file, mrn_to_prw_id_df)
+
+    # Add allergy data to patients_df
+    patients_df = patients_df.merge(allergy_df, on="prw_id", how="left")
 
     # Transform data only to partition PHI into separate DB. All other data
     # transformations should be done by later flows in the pipeline.

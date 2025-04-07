@@ -16,6 +16,6 @@ python_version = "3"
 
 [packages]
 python-dotenv = "*"
-prefect = {extras = ["aws", "shell", "github"], version = "*"}
+prefect = {extras = ["shell", "github", "aws"], version = "*"}
 
 [dev-packages]

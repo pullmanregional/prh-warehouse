@@ -158,15 +158,18 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     patients_df["mrn"] = patients_df["mrn"].astype(str)
     encounters_df["mrn"] = encounters_df["mrn"].astype(str)
 
-    # Convert dob from YYYY-MM-DD to an int YYYYMMDD
-    patients_df["dob"] = pd.to_datetime(patients_df["dob"]).apply(
-        lambda x: int(x.strftime("%Y%m%d")) if pd.notna(x) else None
-    )
-
     # Convert with_pcp to boolean (CSV might have 0/1 instead of True/False)
     encounters_df["with_pcp"] = encounters_df["with_pcp"].astype(bool)
 
-    # AppointmentTimeOfDayKey is in HHMM 24-hour format (e.g., 1400), keep 4 character string
+    # Handle date/time formats
+    # BirthDate column is in YYYY-MM-DD format
+    patients_df["dob"] = pd.to_datetime(patients_df["dob"])
+
+    # AppointmentDateKey is in YYYYMMDD format (e.g., 20240301)
+    # AppointmentTimeOfDayKey is in HHMM 24-hour format (e.g., 1400)
+    encounters_df["encounter_date"] = pd.to_datetime(
+        encounters_df["encounter_date"].astype(str), format="%Y%m%d"
+    )
     encounters_df["encounter_time"] = (
         encounters_df["encounter_time"].astype(str).str.zfill(4)
     )
@@ -239,9 +242,9 @@ def read_mychart_status(mychart_file: str, mrn_to_prw_id_df: pd.DataFrame):
         dtype={"mrn": str, "mychart_status": str, "mychart_activation_date": str},
     )
 
-    # Convert non null mychart_activation_date records to an int YYYYMMDD
+    # Convert non null mychart_activation_date records to datetime
     mychart_df["mychart_activation_date"] = mychart_df["mychart_activation_date"].apply(
-        lambda x: int(x) if x is not None else None
+        lambda x: datetime.strptime(x, "%Y%m%d") if x is not None else None
     )
 
     # Drop duplicate MRNs and map to prw_id
@@ -263,8 +266,8 @@ def calc_patient_age(patients_df: pd.DataFrame):
     logging.info("Calculating patient ages")
     now = pd.Timestamp.now()
 
-    # Convert dob from YYYYMMDD int to datetime
-    dob_df = pd.to_datetime(patients_df["dob"].astype(str), format="%Y%m%d")
+    # Get dob as datetime
+    dob_df = patients_df["dob"]
 
     # Calculate age in years
     # Adjust by 1 year if birthday hasn't occurred this year
@@ -295,12 +298,8 @@ def calc_age_at_encounter(encounters_df: pd.DataFrame, patients_df: pd.DataFrame
         patients_df[["prw_id", "dob"]], on="prw_id", how="left"
     )
 
-    # Convert dob and encounter_date from YYYYMMDD int to datetime
-    dates_df = pd.DataFrame()
-    dates_df["dob"] = pd.to_datetime(encounters_df["dob"].astype(str), format="%Y%m%d")
-    dates_df["encounter_date"] = pd.to_datetime(
-        encounters_df["encounter_date"].astype(str), format="%Y%m%d"
-    )
+    # Get dob and encounter_date as datetimes
+    dates_df = encounters_df[["dob", "encounter_date"]]
 
     # Calculate age of patient at encounter in years (if under 3)
     # Adjust by 1 year if birthday hasn't occurred in encounter year
@@ -443,15 +442,12 @@ def main():
     prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
-    # Explicitly drop data in tables in order for foreign key constraints to be met
-    clear_tables(prw_session, [prw_model.PrwEncounter, prw_model.PrwPatient])
-
     # Write into DB
     clear_tables_and_insert_data(
         prw_session,
         [
             TableData(table=prw_model.PrwPatient, df=patients_df),
-            TableData(table=prw_model.PrwEncounter, df=encounters_df),
+            TableData(table=prw_model.PrwEncounterOutpt, df=encounters_df),
             TableData(table=prw_model.PrwMyChart, df=mychart_df),
         ],
     )

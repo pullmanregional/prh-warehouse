@@ -4,7 +4,7 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 cd "$SCRIPT_DIR"
 
 # Export data sources
-read -p "Caboodle connection (empty to skip): " PRH_SOURCES_EPIC_INPUT_CONN
+read -p "Caboodle connection (empty to skip export): " PRH_SOURCES_EPIC_INPUT_CONN
 echo ""
 if [ -n "$PRH_SOURCES_EPIC_INPUT_CONN" ]; then
     echo "Exporting sources"

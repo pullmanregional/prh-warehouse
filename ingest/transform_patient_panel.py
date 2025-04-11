@@ -49,7 +49,7 @@ def read_source_tables(session: Session) -> SrcData:
     patients_df = pd.read_sql_table("prw_patients", session.bind)
     encounters_df = pd.read_sql_table("prw_encounters_outpt", session.bind)
 
-    # Convert encounter_date from YYYYMMDD int to datetime
+    # Convert encounter_date to datetime
     encounters_df["encounter_date"] = pd.to_datetime(encounters_df["encounter_date"])
 
     return SrcData(patients_df=patients_df, encounters_df=encounters_df)

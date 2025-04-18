@@ -55,8 +55,8 @@ def calc_prw_id(
         )
         prw_id_ensure_unique(new_ids_df, id_col=id_col)
 
-        # Detect collisions where id in new_ids_df was already used in df
-        collisions = new_ids_df[new_ids_df[id_col].isin(df[id_col])]
+        # Detect collisions where id in new_ids_df was already used in existing src_id_to_id_df
+        collisions = new_ids_df[new_ids_df[id_col].isin(src_id_to_id_df[id_col])]
         while len(collisions) > 0:
             # Rehash collisions until all are unique
             for idx, row in collisions.iterrows():
@@ -64,7 +64,7 @@ def calc_prw_id(
                     fnv.hash(row[id_col].encode(), bits=32)
                 )
             prw_id_ensure_unique(new_ids_df, id_col=id_col)
-            collisions = new_ids_df[new_ids_df[id_col].isin(df[id_col])]
+            collisions = new_ids_df[new_ids_df[id_col].isin(src_id_to_id_df[id_col])]
 
         # Assign new prw_ids to df by matching on src_id_col
         df = df.merge(new_ids_df, on=src_id_col, how="left", suffixes=("", "_new"))

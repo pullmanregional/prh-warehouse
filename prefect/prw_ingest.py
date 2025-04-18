@@ -36,6 +36,7 @@ os.environ["PATH"] = (
 
 # Load config from env vars into constants
 PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
+PRW_NOTES_SOURCE_DIR = os.environ.get("PRW_NOTES_SOURCE_DIR")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
 PRW_CONN = os.environ.get("PRW_CONN") or Secret.load("prw-db-url").get()
 PRW_ID_CONN = os.environ.get("PRW_ID_CONN") or Secret.load("prw-id-db-url").get()
@@ -59,7 +60,16 @@ DATAMART_DEPLOYMENTS = [
 @flow
 async def prw_ingest_encounters(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" -prw "{PRW_CONN}" -prwid "{PRW_ID_CONN}" {drop_flag}'
+    cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" --prw "{PRW_CONN}" --prwid "{PRW_ID_CONN}" {drop_flag}'
+    return await shell_op(
+        command=cmd,
+        cwd=INGEST_CODE_ROOT,
+    )
+
+
+@flow
+async def prw_ingest_notes():
+    cmd = f'pipenv run python ingest_notes.py -i "{PRW_NOTES_SOURCE_DIR}" --prw "{PRW_CONN}" --prwid "{PRW_ID_CONN}"'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -69,7 +79,7 @@ async def prw_ingest_encounters(drop_tables=False):
 @flow
 async def prw_ingest_finance(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" -prw "{PRW_CONN}" {drop_flag}'
+    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" --prw "{PRW_CONN}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -125,6 +135,12 @@ async def prw_ingest(
         ingest_flows = [
             prw_ingest_encounters(drop_tables),
             prw_ingest_finance(drop_tables),
+        ]
+        await asyncio.gather(*ingest_flows)
+
+        # Run dependent flows
+        ingest_flows = [
+            prw_ingest_notes(),  # depends on ingest_encounters() to create prw_ids
         ]
         await asyncio.gather(*ingest_flows)
 

@@ -79,7 +79,6 @@ PROVIDER_TO_LOCATION = {
     "GARCIA, CLARA E": "Palouse Medical",
     "FOSBACK, STEPHANIE M": "Palouse Medical",
     "GREGORY, NANCY": "Palouse Medical",
-    "HOWELL, RICHARD L": "Palouse Medical",
     "AIYENOWO, JOSEPH O": "Palouse Medical",
     "BURKE, MORGAN ELIZABETH": "Palouse Medical",
     "HOOVER, MARK A": "Palouse Medical",

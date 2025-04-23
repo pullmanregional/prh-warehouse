@@ -146,7 +146,9 @@ def partition_inpt_ed(
     # Separate notes from the dept "CC WPL EMERGENCY CENTER" or with note_type "ED Provider Notes"
     # into ED notes and the rest into inpatient notes
     ed_mask = (notes_inpt_ed_df["dept"] == "CC WPL EMERGENCY CENTER") | (
-        notes_inpt_ed_df["note_type"].isin(["ED Provider Notes", "ED Notes"])
+        notes_inpt_ed_df["note_type"].isin(
+            ["ED Provider Notes", "ED Notes", "ED Observation Notes"]
+        )
     )
     notes_ed_df = notes_inpt_ed_df.loc[ed_mask]
     notes_inpt_df = notes_inpt_ed_df.loc[~ed_mask]

@@ -19,4 +19,4 @@ fi
 cd "$SCRIPT_DIR/../prefect"
 pwd
 pipenv run prefect profile use dev
-PRW_ENV=$PRW_ENV pipenv run python prw_ingest.py
+PRW_ENV=$PRW_ENV pipenv run python prw_ingest.py --stage1 --stage2

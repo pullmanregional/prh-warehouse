@@ -164,19 +164,19 @@ def run_as_script():
         description="Main Ingest Prefect Flow for PRH warehouse."
     )
     parser.add_argument(
-        "--stage1-only",
+        "--stage1",
         action="store_true",
-        help="Only ingest data, do not run transforms or datamart ingest",
+        help="Ingest data. All stages will run if none of stage1, stage2, or stage3 are set.",
     )
     parser.add_argument(
-        "--stage2-only",
+        "--stage2",
         action="store_true",
-        help="Only run transforms, do not run ingest or datamart subflows",
+        help="Run transforms. All stages will run if none of stage1, stage2, or stage3 are set.",
     )
     parser.add_argument(
-        "--stage3-only",
+        "--stage3",
         action="store_true",
-        help="Only run datamart ingest, do not run ingest or transform subflows",
+        help="Run datamart ingest. All stages will run if none of stage1, stage2, or stage3 are set.",
     )
     parser.add_argument(
         "--drop",
@@ -186,9 +186,10 @@ def run_as_script():
     args = parser.parse_args()
 
     # Determine which subflows to run based on command line args
-    run_ingest = args.stage1_only or not (args.stage2_only or args.stage3_only)
-    run_transform = args.stage2_only or not (args.stage1_only or args.stage3_only)
-    run_datamart = args.stage3_only or not (args.stage1_only or args.stage2_only)
+    run_all = not args.stage1 and not args.stage2 and not args.stage3
+    run_ingest = run_all or args.stage1
+    run_transform = run_all or args.stage2
+    run_datamart = run_all or args.stage3
 
     # Run the main ingest flow
     asyncio.run(

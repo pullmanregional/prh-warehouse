@@ -148,6 +148,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
             "diagnoses",
             "diagnoses_icd",
             "level_of_service",
+            "level_of_service_name",
         ]
     ].copy()
 
@@ -328,6 +329,36 @@ def calc_age_at_encounter(encounters_df: pd.DataFrame, patients_df: pd.DataFrame
     return encounters_df
 
 
+def fix_missing_los_cpt(encounters_df: pd.DataFrame):
+    """
+    Fix missing level_of_service values by extracting CPT codes from level_of_service_name
+    when they follow the pattern 'HC PR ' followed by a code format.
+    """
+    mask = (
+        encounters_df["level_of_service"].isna()
+        & encounters_df["level_of_service_name"].notna()
+        & encounters_df["level_of_service_name"].str.contains("HC PR ", na=False)
+    )
+
+    # For matching rows, extract the CPT code that follows 'HC PR '
+    count = 0
+    if mask.any():
+        # Extract codes that match the pattern: letter + 4 numbers, 4 numbers + letter, or 5 numbers
+        pattern = r"HC PR ([A-Z]\d{4}|\d{4}[A-Z]|\d{5}) "
+        extracted_codes = encounters_df.loc[mask, "level_of_service_name"].str.extract(
+            pattern, expand=False
+        )
+
+        # Count how many row to update
+        count = extracted_codes.notna().sum()
+
+        # Update the level_of_service column with the extracted codes
+        encounters_df.loc[mask, "level_of_service"] = extracted_codes
+
+    logging.info(f"Updated {count} encounter LOS values")
+    return encounters_df
+
+
 def partition_phi(patients_df: pd.DataFrame):
     """
     Partition patients_df into PHI, which will be stored in ID DB, and non-PHI, which will be stored in the main DB
@@ -419,10 +450,11 @@ def main():
     # Add allergy data to patients_df
     patients_df = patients_df.merge(allergy_df, on="prw_id", how="left")
 
-    # Transform data only to partition PHI into separate DB. All other data
-    # transformations should be done by later flows in the pipeline.
+    # Transform data: only data correction and partitioning of PHI into separate DB.
+    # All other data transformations should be done by later flows in the pipeline.
     patients_df = calc_patient_age(patients_df)
     encounters_df = calc_age_at_encounter(encounters_df, patients_df)
+    encounters_df = fix_missing_los_cpt(encounters_df)
     patients_df, id_details_df = partition_phi(patients_df)
 
     # Get connection to output DBs

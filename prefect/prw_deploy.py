@@ -113,6 +113,23 @@ if __name__ == "__main__":
         }
     )
 
+    # Residency dashboard
+    deployment_name = "prw-datamart-residency"
+    deployments[deployment_name] = (
+        None
+        if deployment_names and deployment_name not in deployment_names
+        else {
+            "flow": flow.from_source(
+                source=prh_streamlit_repo,
+                entrypoint="residency/prefect/flow.py:prw_datamart_residency",
+            ),
+            "deploy_params": {
+                "name": deployment_name,
+                "work_pool_name": "ingest",
+            },
+        }
+    )
+
     # SQL reports
     prw_exporter_repo = GitRepository(
         url="https://github.com/pullmanregional/prw-exporter.git",

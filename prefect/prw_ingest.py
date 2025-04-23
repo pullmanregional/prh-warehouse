@@ -51,6 +51,7 @@ DATAMART_DEPLOYMENTS = [
     "prw-datamart-marketing/prw-datamart-marketing",
     "prw-datamart-panel/prw-datamart-panel",
     "prw-datamart-finance/prw-datamart-finance",
+    "prw-datamart-residency/prw-datamart-residency",
 ]
 
 

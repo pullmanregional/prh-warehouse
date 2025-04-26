@@ -74,7 +74,7 @@ def read_notes_inpt(csv_file: str):
             "first_author_name": str,
             "cosigner_name": str,
         },
-        parse_dates=["service_dt"],
+        parse_dates=["service_dt", "dob"],
         index_col=False,
     )
 
@@ -110,6 +110,27 @@ def unspecified_to_null(df: pd.DataFrame) -> pd.DataFrame:
     for col in columns_to_clean:
         if col in df.columns:
             df[col] = df[col].replace("*Unspecified", None)
+    return df
+
+
+def calc_encounter_age(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate age in years at service date of note
+    """
+    logging.info("Calculating patient ages at note date")
+
+    # Get dob and service_dates
+    dates_df = df[["dob", "service_date"]]
+
+    # Calculate age of patient at encounter in years
+    # Adjust by 1 year if birthday hasn't occurred in encounter year
+    df["encounter_age"] = dates_df["service_date"].dt.year - dates_df["dob"].dt.year
+    mask = (dates_df["service_date"].dt.month < dates_df["dob"].dt.month) | (
+        (dates_df["service_date"].dt.month == dates_df["dob"].dt.month)
+        & (dates_df["service_date"].dt.day < dates_df["dob"].dt.day)
+    )
+    df.loc[mask, "encounter_age"] -= 1
+
     return df
 
 
@@ -232,8 +253,9 @@ def main():
     # Read source file into memory
     notes_inpt_ed_df = read_notes_inpt(notes_inpt_ed_file)
 
-    # Basic transforms - convert to PRW IDs and separate inpatient and ED notes
+    # Basic transforms - remove PHI / convert to PRW IDs and separate inpatient and ED notes
     notes_inpt_ed_df = unspecified_to_null(notes_inpt_ed_df)
+    notes_inpt_ed_df = calc_encounter_age(notes_inpt_ed_df)
     notes_inpt_ed_df, new_ids_df = mrn_to_prw_id(notes_inpt_ed_df, mrn_to_prw_id_df)
     notes_inpt_df, notes_ed_df = partition_inpt_ed(notes_inpt_ed_df)
 

@@ -167,7 +167,8 @@ if __name__ == "__main__":
             ),
             "deploy_params": {
                 "name": deployment_name,
-                "schedule": Schedule(cron="0 3 * * *", timezone="America/Los_Angeles"),
+                # Daily at 4am. Caboodle prod -> QA happens at ~3am.
+                "schedule": Schedule(cron="0 4 * * *", timezone="America/Los_Angeles"),
                 "work_pool_name": "ingest",
             },
         }

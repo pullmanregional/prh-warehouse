@@ -167,9 +167,10 @@ def parse_arguments():
         require_in=True,
     )
     parser.add_argument(
-        "--incremental",
+        "--backfill",
         action="store_true",
-        help="Only process the last two data files sorted by filename",
+        default=False,
+        help="When false (default), only the last two data files sorted by filename are processed. When true (backfill mode), all charge source files are processed. ",
     )
     return parser.parse_args()
 
@@ -186,7 +187,9 @@ def main():
 
     # Input files
     charges_files = util.find_data_files(in_path)
-    if args.incremental:
+    if args.backfill:
+        logging.info(f"Processing all files: {charges_files}")
+    else:
         charges_files = sorted(charges_files)[-2:]
         logging.info(
             f"Incremental mode: processing only the last 2 files: {charges_files}"

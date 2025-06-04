@@ -134,27 +134,6 @@ def calc_encounter_age(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def mrn_to_prw_id(
-    df: pd.DataFrame, mrn_to_prw_id_df: pd.DataFrame
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    # Calculate PRW ID from MRN for patients that don't have one
-    patients_df = df.drop_duplicates(subset=["mrn"], keep="first")
-    patients_df = prw_id_utils.calc_prw_id(
-        patients_df,
-        src_id_to_id_df=mrn_to_prw_id_df,
-    )
-
-    # Get new PRW IDs that were added and combine with existing map
-    new_ids_df = patients_df[~patients_df["prw_id"].isin(mrn_to_prw_id_df["prw_id"])]
-    mrn_to_prw_id_df = pd.concat([mrn_to_prw_id_df, new_ids_df[["prw_id", "mrn"]]])
-
-    # Merge into data
-    df = df.merge(mrn_to_prw_id_df, on="mrn", how="left")
-
-    # Return data with PRW IDs and new IDs that were created
-    return df, new_ids_df
-
-
 def add_id_details(ids_df: pd.DataFrame, data_df: pd.DataFrame) -> pd.DataFrame:
     # Add back details (ie name field) for given PRW IDs
     ids_df = ids_df.merge(data_df[["prw_id", "name"]], on="prw_id", how="left")
@@ -256,7 +235,9 @@ def main():
     # Basic transforms - remove PHI / convert to PRW IDs and separate inpatient and ED notes
     notes_inpt_ed_df = unspecified_to_null(notes_inpt_ed_df)
     notes_inpt_ed_df = calc_encounter_age(notes_inpt_ed_df)
-    notes_inpt_ed_df, new_ids_df = mrn_to_prw_id(notes_inpt_ed_df, mrn_to_prw_id_df)
+    notes_inpt_ed_df, new_ids_df = prw_id_utils.mrn_to_prw_id_col(
+        notes_inpt_ed_df, mrn_to_prw_id_df
+    )
     notes_inpt_df, notes_ed_df = partition_inpt_ed(notes_inpt_ed_df)
 
     # Get connection to output DBs

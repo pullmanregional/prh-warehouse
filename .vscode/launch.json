@@ -45,6 +45,22 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Python: Ingest Charges (from ./data/)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "ingest_charges.py",
+      "cwd": "${workspaceFolder}/ingest",
+      "args": [
+        "-i",
+        "./data/epic/charges",
+        "--prw",
+        "${input:prwConnectionString}",
+        "--prwid",
+        "${input:prwConnectionString}"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Python: Ingest Finance (from ./data/)",
       "type": "debugpy",
       "request": "launch",

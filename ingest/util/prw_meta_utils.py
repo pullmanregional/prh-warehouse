@@ -14,6 +14,7 @@ def write_meta(session: Session, dataset: str, modified: dict = None):
 
     # Store now as the last ingest time, replace existing records
     # Update existing record if it exists, otherwise create new
+    prw_meta_model.PrwMetaModel.metadata.create_all(session.connection())
     stmt = select(prw_meta_model.PrwMeta).where(
         prw_meta_model.PrwMeta.dataset == dataset
     )

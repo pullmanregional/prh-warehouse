@@ -76,3 +76,29 @@ def calc_prw_id(
         prw_id_ensure_unique(df, id_col=id_col)
 
     return df
+
+
+def mrn_to_prw_id_col(
+    df: pd.DataFrame, mrn_to_prw_id_df: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Given a DataFrame with a MRN column, calculates a PRW ID column and updates the mrn_to_prw_id_df
+    with new mappings. Returns the updated DataFrame with the PRW ID column and the new mappings.
+    """
+    # Calculate PRW ID from MRN for patients that don't have one
+    patients_df = df.drop_duplicates(subset=["mrn"], keep="first")
+    patients_df = patients_df.dropna(subset=["mrn"])
+    patients_df = calc_prw_id(
+        patients_df,
+        src_id_to_id_df=mrn_to_prw_id_df,
+    )
+
+    # Get new PRW IDs that were added and combine with existing map
+    new_ids_df = patients_df[~patients_df["prw_id"].isin(mrn_to_prw_id_df["prw_id"])]
+    mrn_to_prw_id_df = pd.concat([mrn_to_prw_id_df, new_ids_df[["prw_id", "mrn"]]])
+
+    # Merge into data
+    df = df.merge(mrn_to_prw_id_df, on="mrn", how="left")
+
+    # Return data with PRW IDs and new IDs that were created
+    return df, new_ids_df

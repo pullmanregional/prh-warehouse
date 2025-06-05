@@ -246,6 +246,7 @@ def main():
             [
                 TableData(table=prw_model.PrwCharges, df=charges_df),
             ],
+            chunk_size=20000,
         )
 
         # Accumulate new IDs

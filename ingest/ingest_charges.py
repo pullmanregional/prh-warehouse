@@ -105,6 +105,7 @@ def read_charges(csv_file: str):
             "RevenueCode": "rev_code",
             "RevenueCodeName": "rev_code_desc",
             "RvuWork": "wrvu",
+            "RvuTotal": "trvu",
             "ReversalReason": "reversal_reason",
             "ChargeAmount": "charge_amount",
             "IsInactive": "is_inactive",

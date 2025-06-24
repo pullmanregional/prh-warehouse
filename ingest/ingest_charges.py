@@ -62,7 +62,7 @@ def read_charges(csv_file: str):
         dtype={
             "BillingTransactionKey": int,
             "PrimaryMRN": str,
-            "EncounterCSN": "Int64",
+            "EncounterCSN": str,
             "ServiceDateKey": int,
             "PostDateKey": int,
             "BillingProviderName": str,

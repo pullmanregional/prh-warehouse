@@ -20,7 +20,6 @@ jobs:
           # Load env variables from .env.prod
           if [ -f "prw-exporter/sources/epic/prefect/.env.prod" ]; then
             echo "Loading environment variables from .env.prod"
-            cat prw-exporter/sources/epic/prefect/.env.prod
             set -a; source prw-exporter/sources/epic/prefect/.env.prod; set +a
             env
           else
@@ -30,6 +29,6 @@ jobs:
           # Run script
           cd prw-exporter/sources/epic
           pipenv install --deploy
-          pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}" --out "${{ env.PRH_SOURCES_EPIC_OUTPUT_PATH }}"
+          pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}" --out "$PRH_SOURCES_EPIC_OUTPUT_PATH"
         env:
           PIPENV_CUSTOM_VENV_NAME: sources-epic

@@ -7,11 +7,19 @@ jobs:
   run-sources-epic:
     runs-on: ubuntu-latest
     steps:
+      - name: Debug token
+        run: |
+          if [ -n "${{ secrets.REPO_PAT }}" ]; then
+            echo "REPO_PAT is set (length: ${#REPO_PAT})"
+          else
+            echo "REPO_PAT is not set"
+          fi
+      
       - name: Checkout prw-exporter
         uses: actions/checkout@v4
         with:
           repository: pullmanregional/prw-exporter
-          token: ${{ secrets.CHECKOUT_PAT }}
+          token: ${{ secrets.REPO_PAT }}
           path: prw-exporter
 
       - name: Set up Python

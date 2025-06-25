@@ -29,8 +29,7 @@ jobs:
           cd prw-exporter/sources/epic
           pipenv install --deploy
         env:
-          PIPENV_IGNORE_VIRTUALENVS: 1
-          PIPENV_CUSTOM_VENV_NAME: ${{ env.PRH_SOURCES_EPIC_VENV_NAME }}
+          PIPENV_CUSTOM_VENV_NAME: sources-epic
 
       - name: Run script
         run: |
@@ -44,4 +43,4 @@ jobs:
 
           # Run script
           cd prw-exporter/sources/epic
-          pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }} --out "${{ env.PRH_SOURCES_EPIC_OUTPUT_PATH }}"
+          pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}" --out "${{ env.PRH_SOURCES_EPIC_OUTPUT_PATH }}"

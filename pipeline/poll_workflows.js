@@ -1,7 +1,7 @@
 /**
  * Polls GitHub Actions workflows and waits for completion.
  */
-const GH = require('./ghclient');
+import GH from './ghclient.js';
 
 // Default timeout 1 hour
 const POLL_TIMEOUT_SEC = parseInt(process.env.POLL_TIMEOUT_SEC || 3600);

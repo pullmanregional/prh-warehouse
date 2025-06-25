@@ -1,7 +1,7 @@
 /**
  * Used by Github Actions workflows to trigger other workflows.
  */
-const GH = require('./ghclient');
+import GH from './ghclient.js';
 
 // Get workflows from commandline and repo info from environment
 const workflowIds = process.argv.slice(2).map(id => `${id}.yml`);

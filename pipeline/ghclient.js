@@ -1,7 +1,7 @@
 /**
  * Basic GitHub API client
  */
-const https = require('https');
+import https from 'https';
 
 function req(path, method = 'GET', data = null, timeout = 30000) {
     return new Promise((resolve, reject) => {
@@ -52,4 +52,4 @@ function req(path, method = 'GET', data = null, timeout = 30000) {
     });
 }
 
-module.exports = { req }; 
+export default { req }; 

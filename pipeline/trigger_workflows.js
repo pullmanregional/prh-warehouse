@@ -3,6 +3,7 @@
  */
 import { Octokit } from '@octokit/rest';
 
+console.log(process.env.REPO_PAT);
 const octokit = new Octokit({
     auth: process.env.REPO_PAT,
 });

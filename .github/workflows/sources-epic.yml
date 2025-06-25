@@ -21,7 +21,7 @@ jobs:
           if [ -f "prw-exporter/sources/epic/prefect/.env.prod" ]; then
             echo "Loading environment variables from .env.prod"
             cat prw-exporter/sources/epic/prefect/.env.prod
-            source prw-exporter/sources/epic/prefect/.env.prod
+            set -a; source prw-exporter/sources/epic/prefect/.env.prod; set +a
             env
           else
             echo "Warning: .env.prod file not found"

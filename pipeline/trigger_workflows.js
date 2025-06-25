@@ -19,7 +19,7 @@ for (const workflowId of workflowIds) {
         });
         console.log(`Triggered workflow: ${workflowId}`);
     } catch (error) {
-        console.error(`Error triggering workflow ${workflowId}:`, error.message);
+        console.error(`Error triggering workflow "${workflowId}":`, error.message);
         process.exit(1);
     }
 }

@@ -1,0 +1,49 @@
+name: Sources Epic
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-sources-epic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout prw-exporter
+        uses: actions/checkout@v4
+        with:
+          repository: pullmanregional/prw-exporter
+          token: ${{ secrets.CHECKOUT_PAT }}
+          path: prw-exporter
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install pipenv
+        run: |
+          pip install pipenv
+
+      - name: Load environment variables
+        run: |
+          if [ -f "prw-exporter/sources/epic/.env.prod" ]; then
+            export $(cat prw-exporter/sources/epic/.env.prod | xargs)
+            echo "Loaded environment variables from .env.prod"
+          else
+            echo "Warning: .env.prod file not found"
+          fi
+
+      - name: Install dependencies
+        run: |
+          cd prw-exporter/sources/epic
+          pipenv install --deploy
+        env:
+          PIPENV_IGNORE_VIRTUALENVS: 1
+          PIPENV_CUSTOM_VENV_NAME: ${{ env.PRH_SOURCES_EPIC_VENV_NAME }}
+
+      - name: Run SQL scripts
+        run: |
+          cd prw-exporter/sources/epic
+          pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}"
+        env:
+          CABOODLE_CONN: ${{ secrets.CABOODLE_CONN }}
+          CLARITY_CONN: ${{ secrets.CLARITY_CONN }}

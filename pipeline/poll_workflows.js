@@ -1,7 +1,11 @@
 /**
  * Polls GitHub Actions workflows and waits for completion.
  */
-import GH from './ghclient.js';
+import { Octokit } from 'https://esm.sh/@octokit/rest';
+
+const octokit = new Octokit({
+    auth: process.env.REPO_PAT,
+});
 
 // Default timeout 1 hour
 const POLL_TIMEOUT_SEC = parseInt(process.env.POLL_TIMEOUT_SEC || 3600);
@@ -29,8 +33,14 @@ for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let allSuccess = true;
     for (const workflowName of workflowNames) {
         try {
-            const runs = await GH.req(`/repos/${owner}/${repo}/actions/workflows/${workflowName}.yml/runs?per_page=1`);
-            const run = runs?.workflow_runs?.[0];
+            const { data } = await octokit.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: `${workflowName}.yml`,
+                per_page: 1
+            });
+
+            const run = data?.workflow_runs?.[0];
             let result = 'pending';
             if (run?.status === 'completed') {
                 result = (run.conclusion === 'success') ? 'success' : 'fail';

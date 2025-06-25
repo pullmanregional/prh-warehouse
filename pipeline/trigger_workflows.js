@@ -1,7 +1,11 @@
 /**
  * Used by Github Actions workflows to trigger other workflows.
  */
-import GH from './ghclient.js';
+import { Octokit } from 'https://esm.sh/@octokit/rest';
+
+const octokit = new Octokit({
+    auth: process.env.REPO_PAT,
+});
 
 // Get workflows from commandline and repo info from environment
 const workflowIds = process.argv.slice(2).map(id => `${id}.yml`);
@@ -14,7 +18,10 @@ if (workflowIds.length === 0) {
 
 for (const workflowId of workflowIds) {
     try {
-        await GH.req(`/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`, 'POST', {
+        await octokit.actions.createWorkflowDispatch({
+            owner,
+            repo,
+            workflow_id: workflowId,
             ref: "main"
         });
         console.log(`Triggered workflow: ${workflowId}`);

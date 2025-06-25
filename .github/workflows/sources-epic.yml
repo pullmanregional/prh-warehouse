@@ -24,15 +24,6 @@ jobs:
         run: |
           pip install pipenv
 
-      - name: Load environment variables
-        run: |
-          if [ -f "prw-exporter/sources/epic/prefect/env.prod" ]; then
-            export $(cat prw-exporter/sources/epic/prefect/env.prod | xargs)
-            echo "Loaded environment variables from .env.prod"
-          else
-            echo "Warning: .env.prod file not found"
-          fi
-
       - name: Install dependencies
         run: |
           cd prw-exporter/sources/epic
@@ -41,10 +32,16 @@ jobs:
           PIPENV_IGNORE_VIRTUALENVS: 1
           PIPENV_CUSTOM_VENV_NAME: ${{ env.PRH_SOURCES_EPIC_VENV_NAME }}
 
-      - name: Run SQL scripts
+      - name: Run script
         run: |
+          # Load env variables from .env.prod
+          if [ -f "prw-exporter/sources/epic/prefect/env.prod" ]; then
+            export $(cat prw-exporter/sources/epic/prefect/env.prod | xargs)
+            echo "Loaded environment variables from .env.prod"
+          else
+            echo "Warning: .env.prod file not found"
+          fi
+
+          # Run script
           cd prw-exporter/sources/epic
-          pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}"
-        env:
-          CABOODLE_CONN: ${{ secrets.CABOODLE_CONN }}
-          CLARITY_CONN: ${{ secrets.CLARITY_CONN }}
+          pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }} --out "${{ env.PRH_SOURCES_EPIC_OUTPUT_PATH }}"

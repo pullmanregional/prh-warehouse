@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   run-sources-epic:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
           GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
 
   await-sources-epic:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: run-sources-epic
     steps:
       - name: Checkout code

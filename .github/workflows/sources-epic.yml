@@ -26,8 +26,8 @@ jobs:
 
       - name: Load environment variables
         run: |
-          if [ -f "prw-exporter/sources/epic/.env.prod" ]; then
-            export $(cat prw-exporter/sources/epic/.env.prod | xargs)
+          if [ -f "prw-exporter/sources/epic/prefect/env.prod" ]; then
+            export $(cat prw-exporter/sources/epic/prefect/env.prod | xargs)
             echo "Loaded environment variables from .env.prod"
           else
             echo "Warning: .env.prod file not found"

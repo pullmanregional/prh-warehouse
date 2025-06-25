@@ -24,13 +24,6 @@ jobs:
         run: |
           pip install pipenv
 
-      - name: Install dependencies
-        run: |
-          cd prw-exporter/sources/epic
-          pipenv install --deploy
-        env:
-          PIPENV_CUSTOM_VENV_NAME: sources-epic
-
       - name: Run script
         run: |
           # Load env variables from .env.prod
@@ -43,4 +36,7 @@ jobs:
 
           # Run script
           cd prw-exporter/sources/epic
+          pipenv install --deploy
           pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}" --out "${{ env.PRH_SOURCES_EPIC_OUTPUT_PATH }}"
+        env:
+          PIPENV_CUSTOM_VENV_NAME: sources-epic

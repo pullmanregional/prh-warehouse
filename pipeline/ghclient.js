@@ -11,7 +11,7 @@ function req(path, method = 'GET', data = null, timeout = 30000) {
             path: path,
             method: method,
             headers: {
-                'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+                'Authorization': `token ${process.env.REPO_PAT}`,
                 'User-Agent': 'GitHub-Actions-Workflow',
                 'Accept': 'application/vnd.github.v3+json'
             },

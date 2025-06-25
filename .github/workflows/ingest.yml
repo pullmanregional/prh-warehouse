@@ -6,7 +6,6 @@ on:
 permissions:
   actions: write
   contents: read
-  workflows: write
 
 jobs:
   run-sources-epic:

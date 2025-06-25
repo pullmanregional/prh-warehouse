@@ -3,9 +3,12 @@
  */
 import { Octokit } from '@octokit/rest';
 
-console.log(process.env.REPO_PAT);
+if (!process.env.GH_AUTH_TOKEN) {
+    console.error('Github auth token is not set');
+    process.exit(1);
+}
 const octokit = new Octokit({
-    auth: process.env.REPO_PAT,
+    auth: process.env.GH_AUTH_TOKEN,
 });
 
 // Get workflows from commandline and repo info from environment

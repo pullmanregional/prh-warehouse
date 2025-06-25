@@ -3,8 +3,12 @@
  */
 import { Octokit } from '@octokit/rest';
 
+if (!process.env.GH_AUTH_TOKEN) {
+    console.error('Github auth token is not set');
+    process.exit(1);
+}
 const octokit = new Octokit({
-    auth: process.env.REPO_PAT,
+    auth: process.env.GH_AUTH_TOKEN,
 });
 
 // Default timeout 1 hour

@@ -12,5 +12,9 @@ ingest/data/*
 ads/bin
 ads/obj
 
+# Node
+node_modules
+package-lock.json
+
 # OS
 .DS_Store

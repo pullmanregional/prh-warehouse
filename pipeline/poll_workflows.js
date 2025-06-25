@@ -1,7 +1,7 @@
 /**
  * Polls GitHub Actions workflows and waits for completion.
  */
-import { Octokit } from 'https://esm.sh/@octokit/rest';
+import { Octokit } from '@octokit/rest';
 
 const octokit = new Octokit({
     auth: process.env.REPO_PAT,

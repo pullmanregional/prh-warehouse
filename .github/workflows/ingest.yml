@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Execute sources-epic
-        run: node pipeline/trigger_workflows.js sources-epic
+        run: npm install && node pipeline/trigger_workflows.js sources-epic
 
   await-sources-epic:
     runs-on: ubuntu-latest
@@ -25,4 +25,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Poll for sources-epic completion
-        run: node pipeline/poll_workflows.js sources-epic
+        run: npm install && node pipeline/poll_workflows.js sources-epic

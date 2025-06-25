@@ -1,0 +1,7 @@
+{
+  "name": "prh-warehouse",
+  "version": "1.0.0",
+  "dependencies": {
+    "@octokit/rest": "^22.0.0"
+  }
+}

@@ -9,7 +9,7 @@ on:
         type: string
 
 jobs:
-  run-sources-epic:
+  run-reports:
     runs-on: self-hosted
     steps:
       - name: Checkout prw-exporter
@@ -35,9 +35,9 @@ jobs:
           cd prw-exporter/reports
           pipenv install --deploy
           if [ -n "${{ inputs.sql_script_to_run }}" ]; then
-            pipenv run python run_sql_scripts.py --prw "${{ secrets.PRW_CONN }}" --out "$PRH_REPORTS_OUTPUT_PATH" --script "${{ inputs.sql_script_to_run }}"
+            pipenv run python run_sql_scripts.py --prw "${{ secrets.PRW_CONN_RO }}" --out "$PRH_REPORTS_OUTPUT_PATH" --script "${{ inputs.sql_script_to_run }}"
           else
-            pipenv run python run_sql_scripts.py --prw "${{ secrets.PRW_CONN }}" --out "$PRH_REPORTS_OUTPUT_PATH"
+            pipenv run python run_sql_scripts.py --prw "${{ secrets.PRW_CONN_RO }}" --out "$PRH_REPORTS_OUTPUT_PATH"
           fi
         env:
           PIPENV_CUSTOM_VENV_NAME: prw-exporter

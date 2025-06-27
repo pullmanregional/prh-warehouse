@@ -1,4 +1,4 @@
-name: Sources Epic
+name: Reports
 
 on:
   workflow_dispatch:
@@ -23,21 +23,21 @@ jobs:
       - name: Run script
         run: |
           # Load env variables from .env.prod
-          if [ -f "prw-exporter/sources/epic/prefect/.env.prod" ]; then
+          if [ -f "prw-exporter/reports/prefect/.env.prod" ]; then
             echo "Loading environment variables from .env.prod"
-            set -a; source prw-exporter/sources/epic/prefect/.env.prod; set +a
+            set -a; source prw-exporter/reports/prefect/.env.prod; set +a
             env
           else
             echo "Warning: .env.prod file not found"
           fi
 
           # Run script
-          cd prw-exporter/sources/epic
+          cd prw-exporter/reports
           pipenv install --deploy
           if [ -n "${{ inputs.sql_script_to_run }}" ]; then
-            pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}" --out "$PRH_SOURCES_EPIC_OUTPUT_PATH" --script "${{ inputs.sql_script_to_run }}"
+            pipenv run python run_sql_scripts.py --prw "${{ secrets.PRW_CONN }}" --out "$PRH_REPORTS_OUTPUT_PATH" --script "${{ inputs.sql_script_to_run }}"
           else
-            pipenv run python run_sql_scripts.py --caboodle "${{ secrets.CABOODLE_CONN }}" --clarity "${{ secrets.CLARITY_CONN }}" --out "$PRH_SOURCES_EPIC_OUTPUT_PATH"
+            pipenv run python run_sql_scripts.py --prw "${{ secrets.PRW_CONN }}" --out "$PRH_REPORTS_OUTPUT_PATH"
           fi
         env:
           PIPENV_CUSTOM_VENV_NAME: prw-exporter

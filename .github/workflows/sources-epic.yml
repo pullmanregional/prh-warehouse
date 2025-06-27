@@ -2,6 +2,11 @@ name: Sources Epic
 
 on:
   workflow_dispatch:
+    inputs:
+      sql_script_to_run:
+        description: 'SQL Script to Run (optional)'
+        required: false
+        type: string
 
 jobs:
   run-sources-epic:
@@ -24,6 +29,11 @@ jobs:
             env
           else
             echo "Warning: .env.prod file not found"
+          fi
+
+          # Set script to run if provided
+          if [ -n "${{ inputs.sql_script_to_run }}" ]; then
+            export PRW_SOURCES_EPIC_SCRIPT="${{ inputs.sql_script_to_run }}"
           fi
 
           # Run script

@@ -127,6 +127,7 @@ def unspecified_to_null(df: pd.DataFrame) -> pd.DataFrame:
     """
     columns_to_clean = [
         "billing_provider",
+        "posting_user",
         "modifiers",
         "reversal_reason",
     ]

@@ -133,7 +133,7 @@ def unspecified_to_null(df: pd.DataFrame) -> pd.DataFrame:
     ]
     for col in columns_to_clean:
         if col in df.columns:
-            df[col] = df[col].replace("*Unspecified", None)
+            df[col] = df[col].replace(["*Unspecified", ""], None)
     return df
 
 

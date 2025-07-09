@@ -1,5 +1,6 @@
 import os
 import logging
+import csv
 import pandas as pd
 from datetime import datetime
 from sqlmodel import Session, select, inspect
@@ -118,6 +119,30 @@ def read_charges(csv_file: str):
     return df
 
 
+def read_cms_rvu_csv(cms_rvu_file: str) -> pd.DataFrame:
+    """
+    Read the CMS RVU CSV file and return a dataframe mapping procedure code to tRVU values.
+    Skips the first 10 lines, then retains columns: 1 (HCPCS), 6 (wRVU),12 (non-facility tRVU), 13 (facility tRVU).
+    The totals are floats.
+    """
+    df = pd.read_csv(
+        cms_rvu_file,
+        skiprows=10,
+        header=0,
+        usecols=[0, 5, 11, 12],
+        dtype={0: str, 5: float, 11: float, 12: float},
+    )
+    df = df.rename(
+        columns={
+            df.columns[0]: "hcpcs",
+            df.columns[1]: "wrvu",
+            df.columns[2]: "nonfacility_trvu",
+            df.columns[3]: "facility_trvu",
+        }
+    )
+    return df
+
+
 # -------------------------------------------------------
 # Transform
 # -------------------------------------------------------
@@ -135,6 +160,28 @@ def unspecified_to_null(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = df[col].replace(["*Unspecified", ""], None)
     return df
+
+
+def calculate_trvu(
+    charges_df: pd.DataFrame, cms_rvu_df: pd.DataFrame | None
+) -> pd.DataFrame:
+    """
+    If mapping is provided, map from CPT code to facility tRVUs in charges. Otherwise, just use current values,
+    which are from Epic.
+    """
+    if cms_rvu_df is None:
+        return charges_df
+
+    # Map from CPT code to facility tRVUs
+    charges_df = charges_df.merge(
+        cms_rvu_df[["hcpcs", "facility_trvu"]],
+        left_on="procedure_code",
+        right_on="hcpcs",
+        how="left",
+    )
+    charges_df = charges_df.drop(columns=["trvu", "hcpcs"])
+    charges_df = charges_df.rename(columns={"facility_trvu": "trvu"})
+    return charges_df
 
 
 # -------------------------------------------------------
@@ -177,6 +224,12 @@ def parse_arguments():
         require_in=True,
     )
     parser.add_argument(
+        "--cms-rvu-file",
+        type=str,
+        default=None,
+        help="Path to the CMS RVU file to use to calculate tRVU values. If not provided, tRVU values will be taken from Epic.",
+    )
+    parser.add_argument(
         "--backfill",
         action="store_true",
         default=False,
@@ -191,6 +244,7 @@ def main():
     in_path = args.input
     output_conn = args.prw
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
+    cms_rvu_file = args.cms_rvu_file
     logging.info(
         f"Input: {in_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
     )
@@ -209,6 +263,14 @@ def main():
     if not sanity_check_files(charges_files):
         logging.error("ERROR: input error (see above). Terminating.")
         exit(1)
+
+    # Read RVU mapping file if provided
+    if cms_rvu_file:
+        logging.info(f"Using CMS RVU mappings from: {cms_rvu_file}")
+        cms_rvu_df = read_cms_rvu_csv(cms_rvu_file)
+    else:
+        logging.info(f"No CMS RVU mappings provided. Will use tRVUs from Epic.")
+        cms_rvu_df = None
 
     # If ID DB is specified, read existing ID mappings
     prw_id_engine, mrn_to_prw_id_df = None, None
@@ -249,6 +311,9 @@ def main():
         charges_df, new_ids_df = prw_id_utils.mrn_to_prw_id_col(
             charges_df, mrn_to_prw_id_df
         )
+
+        # Calculate tRVU values if CMS RVU mappings are provided
+        charges_df = calculate_trvu(charges_df, cms_rvu_df)
 
         # Insert/update into DB
         upsert_data(

@@ -1,0 +1,22 @@
+name: Sources CMS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-sources-epic:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout prw-exporter
+        uses: actions/checkout@v4
+        with:
+          repository: pullmanregional/prw-exporter
+          token: ${{ secrets.DEPLOY_PAT }}
+          path: prw-exporter
+          submodules: true
+
+      - name: Run script
+        run: |
+          cd prw-exporter/sources/cms
+          pwd
+          ./fetch-pfs.sh --out /home/prefect/Sources/cms/

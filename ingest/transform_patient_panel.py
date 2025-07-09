@@ -62,6 +62,12 @@ PEDS_LOCATIONS = [
     "CC WPL PALOUSE PEDIATRICS PULLMAN",
     "CC WPL PALOUSE PEDIATRICS MOSCOW",
 ]
+PCP_LOCATIONS = PEDS_LOCATIONS + [
+    "CC WPL FM RESIDENCY CLINIC",
+    "CC WPL PALOUSE HEALTH CTR PRIM CARE",
+    "CC WPL PALOUSE MED PRIMARY CARE",
+    "CC WPL PULLMAN FAMILY MEDICINE",
+]
 PROVIDER_TO_LOCATION = {
     # Palouse Pediatrics - empanelment via transform_add_peds_panels(), do not process in this map
     # Pullman Family Medicine
@@ -130,6 +136,9 @@ def transform_filter_encounters(src: SrcData):
         &
         # Only retain completed encounters
         (src.encounters_df["appt_status"] == "Completed")
+        &
+        # Only retain encounters at PCP locations
+        (src.encounters_df["dept"].isin(PCP_LOCATIONS))
     ]
 
 

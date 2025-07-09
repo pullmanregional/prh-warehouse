@@ -140,6 +140,7 @@ def read_cms_rvu_csv(cms_rvu_file: str) -> pd.DataFrame:
             df.columns[3]: "facility_trvu",
         }
     )
+    df = df.drop_duplicates(subset=["hcpcs"])
     return df
 
 
@@ -181,6 +182,9 @@ def calculate_trvu(
     )
     charges_df = charges_df.drop(columns=["trvu", "hcpcs"])
     charges_df = charges_df.rename(columns={"facility_trvu": "trvu"})
+
+    # Multiply tRVU by quantity
+    charges_df["trvu"] = charges_df["trvu"] * charges_df["quantity"]
     return charges_df
 
 

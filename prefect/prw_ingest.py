@@ -38,6 +38,7 @@ os.environ["PATH"] = (
 PRW_ENCOUNTERS_SOURCE_DIR = os.environ.get("PRW_ENCOUNTERS_SOURCE_DIR")
 PRW_NOTES_SOURCE_DIR = os.environ.get("PRW_NOTES_SOURCE_DIR")
 PRW_CHARGES_SOURCE_DIR = os.environ.get("PRW_CHARGES_SOURCE_DIR")
+PRW_IMAGING_SOURCE_DIR = os.environ.get("PRW_IMAGING_SOURCE_DIR")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
 PRW_CONN = os.environ.get("PRW_CONN") or Secret.load("prw-db-url").get()
 PRW_ID_CONN = os.environ.get("PRW_ID_CONN") or Secret.load("prw-id-db-url").get()
@@ -82,6 +83,15 @@ async def prw_ingest_notes():
 @flow
 async def prw_ingest_charges():
     cmd = f'pipenv run python ingest_charges.py -i "{PRW_CHARGES_SOURCE_DIR}" --prw "{PRW_CONN}" --prwid "{PRW_ID_CONN}"'
+    return await shell_op(
+        command=cmd,
+        cwd=INGEST_CODE_ROOT,
+    )
+
+
+@flow
+async def prw_ingest_imaging():
+    cmd = f'pipenv run python ingest_imaging.py -i "{PRW_IMAGING_SOURCE_DIR}" --prw "{PRW_CONN}"'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -147,6 +157,7 @@ async def prw_ingest(
         ingest_flows = [
             prw_ingest_encounters(drop_tables),
             prw_ingest_finance(drop_tables),
+            prw_ingest_imaging(),
         ]
         await asyncio.gather(*ingest_flows)
 

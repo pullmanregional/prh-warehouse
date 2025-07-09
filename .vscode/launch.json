@@ -61,6 +61,20 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Python: Ingest Imaging (from ./data/)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "ingest_imaging.py",
+      "cwd": "${workspaceFolder}/ingest",
+      "args": [
+        "-i",
+        "./data/epic",
+        "--prw",
+        "${input:prwConnectionString}",
+      ],
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Python: Ingest Finance (from ./data/)",
       "type": "debugpy",
       "request": "launch",

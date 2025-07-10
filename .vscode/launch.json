@@ -57,8 +57,8 @@
         "${input:prwConnectionString}",
         "--prwid",
         "${input:prwConnectionString}",
-        "--cms-rvu-file",
-        "./data/cms/PPRRVU2025_Jul.csv"
+        "--rvu-mapping",
+        "./data/cms"
       ],
       "console": "integratedTerminal"
     },

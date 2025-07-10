@@ -1,6 +1,6 @@
 import os
 import logging
-import csv
+import glob
 import pandas as pd
 from datetime import datetime
 from sqlmodel import Session, select, inspect
@@ -119,27 +119,55 @@ def read_charges(csv_file: str):
     return df
 
 
-def read_cms_rvu_csv(cms_rvu_file: str) -> pd.DataFrame:
+def read_rvu_mappings(rvu_mapping_path: str) -> pd.DataFrame:
     """
     Read the CMS RVU CSV file and return a dataframe mapping procedure code to tRVU values.
     Skips the first 10 lines, then retains columns: 1 (HCPCS), 6 (wRVU),12 (non-facility tRVU), 13 (facility tRVU).
     The totals are floats.
     """
+    # Find the CMS RVU CSV file, PPRRVU*.csv, with the latest timestamp
+    cms_rvu_files = glob.glob(os.path.join(rvu_mapping_path, "PPRRVU*.csv"))
+    if len(cms_rvu_files) == 0:
+        return None
+    cms_rvu_file = max(cms_rvu_files, key=os.path.getmtime)
+    logging.info(f"Using CMS RVU file: {cms_rvu_file}")
+
+    # Supplemental RVU mapping file from data provided from Samaritan. This file is currently manually
+    # exported from the Excel worksheet with the same name in "EpicReports/SamaritanExternal/Rev_by_Rev_Code/MASTER CDM Report 120423.xlsx"
+    samaritan_rvu_file = os.path.join(rvu_mapping_path, "Samaritan_CDM.csv")
+
     df = pd.read_csv(
         cms_rvu_file,
         skiprows=10,
         header=0,
         usecols=[0, 5, 11, 12],
-        dtype={0: str, 5: float, 11: float, 12: float},
+        names=["hcpcs", "wrvu", "nonfacility_trvu", "facility_trvu"],
+        dtype={
+            "hcpcs": str,
+            "wrvu": float,
+            "nonfacility_trvu": float,
+            "facility_trvu": float,
+        },
     )
-    df = df.rename(
-        columns={
-            df.columns[0]: "hcpcs",
-            df.columns[1]: "wrvu",
-            df.columns[2]: "nonfacility_trvu",
-            df.columns[3]: "facility_trvu",
-        }
+    samaritan_df = pd.read_csv(
+        samaritan_rvu_file,
+        skiprows=10,
+        header=0,
+        usecols=[0, 3, 5, 11, 31],
+        names=["hcpcs", "status_code", "wrvu", "nonfacility_trvu", "facility_trvu"],
+        dtype={
+            "hcpcs": str,
+            "wrvu": float,
+            "nonfacility_trvu": float,
+            "facility_trvu": float,
+        },
     )
+    # Retain only supplemental data, which is marked as "Imputed" in column D (Status Code)
+    samaritan_df = samaritan_df[samaritan_df["status_code"] == "Imputed"]
+    samaritan_df = samaritan_df.drop(columns=["status_code"])
+
+    # Combine CMS and supplemental data
+    df = pd.concat([df, samaritan_df], ignore_index=True)
     df = df.drop_duplicates(subset=["hcpcs"])
     return df
 
@@ -164,18 +192,18 @@ def unspecified_to_null(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def calculate_trvu(
-    charges_df: pd.DataFrame, cms_rvu_df: pd.DataFrame | None
+    charges_df: pd.DataFrame, rvu_mappings_df: pd.DataFrame | None
 ) -> pd.DataFrame:
     """
     If mapping is provided, map from CPT code to facility tRVUs in charges. Otherwise, just use current values,
     which are from Epic.
     """
-    if cms_rvu_df is None:
+    if rvu_mappings_df is None:
         return charges_df
 
     # Map from CPT code to facility tRVUs
     charges_df = charges_df.merge(
-        cms_rvu_df[["hcpcs", "facility_trvu"]],
+        rvu_mappings_df[["hcpcs", "facility_trvu"]],
         left_on="procedure_code",
         right_on="hcpcs",
         how="left",
@@ -228,10 +256,10 @@ def parse_arguments():
         require_in=True,
     )
     parser.add_argument(
-        "--cms-rvu-file",
+        "--rvu-mapping",
         type=str,
         default=None,
-        help="Path to the CMS RVU file to use to calculate tRVU values. If not provided, tRVU values will be taken from Epic.",
+        help="Path to the RVU files to use to calculate tRVU values. If not provided, tRVU values will be taken from Epic.",
     )
     parser.add_argument(
         "--backfill",
@@ -248,9 +276,9 @@ def main():
     in_path = args.input
     output_conn = args.prw
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
-    cms_rvu_file = args.cms_rvu_file
+    rvu_mapping_path = args.rvu_mapping
     logging.info(
-        f"Input: {in_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
+        f"Input: {in_path} / {rvu_mapping_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
     )
 
     # Input files
@@ -269,12 +297,12 @@ def main():
         exit(1)
 
     # Read RVU mapping file if provided
-    if cms_rvu_file:
-        logging.info(f"Using CMS RVU mappings from: {cms_rvu_file}")
-        cms_rvu_df = read_cms_rvu_csv(cms_rvu_file)
-    else:
-        logging.info(f"No CMS RVU mappings provided. Will use tRVUs from Epic.")
-        cms_rvu_df = None
+    rvu_mappings_df = None
+    if rvu_mapping_path:
+        logging.info(f"Using RVU mappings from: {rvu_mapping_path}")
+        rvu_mappings_df = read_rvu_mappings(rvu_mapping_path)
+    if rvu_mappings_df is None:
+        logging.info(f"No RVU mappings found. Will use tRVUs from Epic.")
 
     # If ID DB is specified, read existing ID mappings
     prw_id_engine, mrn_to_prw_id_df = None, None
@@ -317,7 +345,7 @@ def main():
         )
 
         # Calculate tRVU values if CMS RVU mappings are provided
-        charges_df = calculate_trvu(charges_df, cms_rvu_df)
+        charges_df = calculate_trvu(charges_df, rvu_mappings_df)
 
         # Insert/update into DB
         upsert_data(

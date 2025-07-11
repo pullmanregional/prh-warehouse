@@ -83,8 +83,10 @@
       "program": "ingest_finance.py",
       "cwd": "${workspaceFolder}/ingest",
       "args": [
-        "-i",
+        "--in",
         "./data/finance",
+        "--epic-in",
+        "./data/epic",
         "--prw",
         "${input:prwConnectionString}",
       ],

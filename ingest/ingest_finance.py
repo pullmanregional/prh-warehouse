@@ -48,7 +48,7 @@ HISTORICAL_HOURS_YEAR = 2022
 # -------------------------------------------------------
 # Extract from Source Files
 # -------------------------------------------------------
-def get_file_paths(base_path):
+def get_file_paths(base_path, epic_in):
     """
     Find all required source files for finance data ingestion.
     Returns paths for:
@@ -64,6 +64,9 @@ def get_file_paths(base_path):
 
     # The DOMO directory contains the latest Dashboard Supporting Data spreadsheet files
     volumes_path = os.path.join(base_path, "DOMO")
+
+    # Miscellaneous volumes file (temp summary data from Epic) is in Sources/epic dir
+    misc_volumes_file = os.path.join(epic_in, "misc-volumes.csv")
 
     # The Natural Class subdir contains income statement in one Excel file per month, eg,
     # ./Natural Class/2022/(01) Jan 2022 Natural Class.xlsx
@@ -81,6 +84,7 @@ def get_file_paths(base_path):
     return (
         historical_volumes_file,
         volumes_path,
+        misc_volumes_file,
         income_stmt_path,
         hours_path,
         historical_hours_file,
@@ -134,6 +138,11 @@ def parse_arguments():
 
     # Add script-specific arguments
     parser.add_argument(
+        "--epic-in",
+        type=str,
+        help="Path to epic source directory",
+    )
+    parser.add_argument(
         "--drop",
         action="store_true",
         help="Drop and recreate all tables before ingesting data",
@@ -145,6 +154,7 @@ def main():
     # Load config from cmd line
     args = parse_arguments()
     base_path = args.input
+    epic_in = args.epic_in
     output_conn = args.prw
     drop_tables = args.drop
     logging.info(f"Data dir: {base_path}, output: {mask_conn_pw(output_conn)}")
@@ -154,14 +164,19 @@ def main():
     (
         historical_volumes_file,
         volumes_path,
+        misc_volumes_file,
         income_stmt_path,
         hours_path,
         historical_hours_file,
-    ) = get_file_paths(base_path)
+    ) = get_file_paths(base_path, epic_in)
 
     # Sanity check data directory expected location and files
     if not sanity.check_data_dir(
-        base_path, historical_volumes_file, income_stmt_path, hours_path
+        base_path,
+        historical_volumes_file,
+        misc_volumes_file,
+        income_stmt_path,
+        hours_path,
     ):
         logging.error("ERROR: data directory error (see above). Terminating.")
         exit(1)
@@ -173,6 +188,7 @@ def main():
     source_files = (
         [historical_volumes_file]
         + volumes_files
+        + [misc_volumes_file]
         + [historical_hours_file]
         + income_stmt_files
         + hours_files
@@ -244,6 +260,9 @@ def main():
         {"contracted_hours_updated_month": [str(contracted_hours_updated_month)]}
     )
 
+    # Get extra volume metrics from Epic data
+    misc_volumes_df = parse.read_misc_volumes_data(misc_volumes_file)
+
     # Read income statement and hours data
     income_stmt_df = parse.read_income_stmt_data(income_stmt_files)
     historical_hours_df = parse.read_historical_hours_and_fte_data(
@@ -278,6 +297,7 @@ def main():
         prw_session,
         [
             TableData(table=PrwVolume, df=volumes_df),
+            TableData(table=PrwMiscVolume, df=misc_volumes_df),
             TableData(table=PrwUOS, df=uos_df),
             TableData(table=PrwBudget, df=budget_df),
             TableData(table=PrwHoursByPayPeriod, df=hours_by_pay_period_df),

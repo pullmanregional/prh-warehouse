@@ -105,6 +105,19 @@ def read_volume_and_uos_data(year, filename, sheet):
     return _process_volume_and_uos_table(df, year, dept_id_to_unit)
 
 
+def read_misc_volumes_data(filename):
+    """
+    Read misc volumes data from Epic CSV file
+    """
+    logging.info(f"Reading {filename}")
+    return pd.read_csv(
+        filename,
+        header=0,
+        names=["month", "metric", "volume"],
+        dtype={"month": str, "metric": str, "volume": int},
+    )
+
+
 def _process_budget_table(df):
     """
     Extract data from the budget table from the Dashboard Supporting Data Excel workbook

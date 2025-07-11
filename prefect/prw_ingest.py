@@ -40,6 +40,7 @@ PRW_NOTES_SOURCE_DIR = os.environ.get("PRW_NOTES_SOURCE_DIR")
 PRW_CHARGES_SOURCE_DIR = os.environ.get("PRW_CHARGES_SOURCE_DIR")
 PRW_IMAGING_SOURCE_DIR = os.environ.get("PRW_IMAGING_SOURCE_DIR")
 PRW_FINANCE_SOURCE_DIR = os.environ.get("PRW_FINANCE_SOURCE_DIR")
+PRW_EPIC_SOURCE_DIR = os.environ.get("PRW_EPIC_SOURCE_DIR")
 PRW_RVU_MAPPING_SOURCE_DIR = os.environ.get("PRW_RVU_MAPPING_SOURCE_DIR")
 PRW_CONN = os.environ.get("PRW_CONN") or Secret.load("prw-db-url").get()
 PRW_ID_CONN = os.environ.get("PRW_ID_CONN") or Secret.load("prw-id-db-url").get()
@@ -102,7 +103,7 @@ async def prw_ingest_imaging():
 @flow
 async def prw_ingest_finance(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
-    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" --prw "{PRW_CONN}" {drop_flag}'
+    cmd = f'pipenv run python ingest_finance.py -i "{PRW_FINANCE_SOURCE_DIR}" --prw "{PRW_CONN}" --epic-in "{PRW_EPIC_SOURCE_DIR}" {drop_flag}'
     return await shell_op(
         command=cmd,
         cwd=INGEST_CODE_ROOT,

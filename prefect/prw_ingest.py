@@ -64,6 +64,16 @@ DATAMART_DEPLOYMENTS = [
 # Ingest source data processes
 # -----------------------------------------
 @flow
+async def prw_ingest_patients(drop_tables=False):
+    drop_flag = "--drop" if drop_tables else ""
+    cmd = f'pipenv run python ingest_patients.py -i "{PRW_EPIC_SOURCE_DIR}" --prw "{PRW_CONN}" --prwid "{PRW_ID_CONN}" {drop_flag}'
+    return await shell_op(
+        command=cmd,
+        cwd=INGEST_CODE_ROOT,
+    )
+
+
+@flow
 async def prw_ingest_encounters(drop_tables=False):
     drop_flag = "--drop" if drop_tables else ""
     cmd = f'pipenv run python ingest_encounters.py -i "{PRW_ENCOUNTERS_SOURCE_DIR}" --prw "{PRW_CONN}" --prwid "{PRW_ID_CONN}" {drop_flag}'
@@ -156,6 +166,10 @@ async def prw_ingest(
 
     if run_ingest:
         # Run ingest subflows
+        # First ingest patients which creates MRN -> PRW ID mapping
+        await prw_ingest_patients(drop_tables)
+
+        # Other
         ingest_flows = [
             prw_ingest_encounters(drop_tables),
             prw_ingest_finance(drop_tables),

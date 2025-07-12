@@ -221,6 +221,11 @@ def read_encounters_ed(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     df = df.merge(mrn_to_prw_id_df[["prw_id", "mrn"]], on="mrn", how="left")
     df.drop(columns=["mrn"], inplace=True)
 
+    null_prw_id_rows = df[df["prw_id"].isnull()]
+    if not null_prw_id_rows.empty:
+        logging.error(f"Rows with null prw_id: {null_prw_id_rows}")
+        exit(1)
+
     return df
 
 

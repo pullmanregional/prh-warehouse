@@ -27,6 +27,26 @@ logging.basicConfig(level=logging.INFO)
 # -------------------------------------------------------
 # Extract from Source Files
 # -------------------------------------------------------
+def sanity_check_files(encounters_file, encounters_ed_file, encounters_inpt_file):
+    """
+    Executed once at the beginning of ingest to validate CSV file
+    meets basic requirements.
+    """
+    error = None
+    if not os.path.isfile(encounters_file):
+        error = f"ERROR: encounters file does not exist: {encounters_file}"
+    elif not os.path.isfile(encounters_ed_file):
+        error = f"ERROR: ED encounters file does not exist: {encounters_ed_file}"
+    elif not os.path.isfile(encounters_inpt_file):
+        error = (
+            f"ERROR: inpatient encounters file does not exist: {encounters_inpt_file}"
+        )
+    if error is not None:
+        print(error)
+
+    return error is None
+
+
 def read_mrn_to_prw_id_table(engine):
     """
     Read existing ID to MRN mapping and other details needed to calculate encounter fields from the PRW ID DB
@@ -149,6 +169,109 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     return encounters_df
 
 
+def read_encounters_ed(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
+    # -------------------------------------------------------
+    # Extract data from CSV file
+    # -------------------------------------------------------
+    logging.info(f"Reading {csv_file}")
+    df = pd.read_csv(
+        csv_file,
+        header=0,
+        usecols=[
+            "PrimaryMRN",
+            "ArrivalInstant",
+            "DepartureInstant",
+            "ChiefComplaint",
+            "Diagnosis",
+            "Age",
+            "FirstAttending",
+            "LastAttending",
+        ],
+        dtype={
+            "PrimaryMRN": str,
+            "Age": int,
+        },
+        index_col=False,
+    )
+    df = df.rename(
+        columns={
+            "PrimaryMRN": "mrn",
+            "ChiefComplaint": "chief_complaint",
+            "Diagnosis": "diagnosis",
+            "Age": "encounter_age",
+            "FirstAttending": "first_attending",
+            "LastAttending": "last_attending",
+        }
+    )
+
+    # -------------------------------------------------------
+    # Fix data types
+    # -------------------------------------------------------
+    # Convert datetime -> date and time columns
+    df["ArrivalInstant"] = pd.to_datetime(df["ArrivalInstant"])
+    df["DepartureInstant"] = pd.to_datetime(df["DepartureInstant"])
+    df["arrival_date"] = df["ArrivalInstant"].dt.date
+    df["departure_date"] = df["DepartureInstant"].dt.date
+    df["arrival_time"] = df["ArrivalInstant"].dt.strftime("%H%M")
+    df["departure_time"] = df["DepartureInstant"].dt.strftime("%H%M")
+
+    # -------------------------------------------------------
+    # Add prw_id to encounters
+    # -------------------------------------------------------
+    df = df.merge(mrn_to_prw_id_df[["prw_id", "mrn"]], on="mrn", how="left")
+    df.drop(columns=["mrn"], inplace=True)
+
+    return df
+
+
+def read_encounters_inpt(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
+    # -------------------------------------------------------
+    # Extract data from CSV file
+    # -------------------------------------------------------
+    logging.info(f"Reading {csv_file}")
+    df = pd.read_csv(
+        csv_file,
+        header=0,
+        usecols=[
+            "PrimaryMRN",
+            "AdmissionDate",
+            "DischargeDate",
+            "Diagnosis",
+            "Department",
+        ],
+        dtype={
+            "PrimaryMRN": str,
+            "AdmissionDate": str,
+            "DischargeDate": str,
+        },
+        index_col=False,
+    )
+    df = df.rename(
+        columns={
+            "PrimaryMRN": "mrn",
+            "Diagnosis": "diagnosis",
+            "Department": "dept",
+        }
+    )
+
+    # -------------------------------------------------------
+    # Fix data types
+    # -------------------------------------------------------
+    # Convert datetime -> date and time columns
+    df.loc[df["AdmissionDate"].astype(int) < 0, "AdmissionDate"] = None
+    df.loc[df["DischargeDate"].astype(int) < 0, "DischargeDate"] = None
+    df["admission_date"] = pd.to_datetime(df["AdmissionDate"], format="%Y%m%d")
+    df["discharge_date"] = pd.to_datetime(df["DischargeDate"], format="%Y%m%d")
+
+    # -------------------------------------------------------
+    # Add prw_id to encounters
+    # -------------------------------------------------------
+    df = df.merge(mrn_to_prw_id_df[["prw_id", "mrn"]], on="mrn", how="left")
+    df.drop(columns=["mrn"], inplace=True)
+
+    return df
+
+
 # -------------------------------------------------------
 # Transform
 # -------------------------------------------------------
@@ -256,8 +379,13 @@ def main():
 
     # Input files
     encounters_file = os.path.join(in_path, "encounters.csv")
-    if not os.path.isfile(encounters_file):
-        logging.error(f"ERROR: encounters file does not exist: {encounters_file}")
+    encounters_ed_file = os.path.join(in_path, "encounters-ed.csv")
+    encounters_inpt_file = os.path.join(in_path, "encounters-inpt.csv")
+
+    if not sanity_check_files(
+        encounters_file, encounters_ed_file, encounters_inpt_file
+    ):
+        logging.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
     # Read existing ID mappings
@@ -269,6 +397,8 @@ def main():
 
     # Read source file into memory
     encounters_df = read_encounters(encounters_file, mrn_to_prw_id_df)
+    encounters_ed_df = read_encounters_ed(encounters_ed_file, mrn_to_prw_id_df)
+    encounters_inpt_df = read_encounters_inpt(encounters_inpt_file, mrn_to_prw_id_df)
 
     # Transform data: only data correction and handling PHI.
     # All other data transformations should be done by later flows in the pipeline.
@@ -296,6 +426,8 @@ def main():
         prw_session,
         [
             TableData(table=prw_model.PrwEncounterOutpt, df=encounters_df),
+            TableData(table=prw_model.PrwEncounterEd, df=encounters_ed_df),
+            TableData(table=prw_model.PrwEncounterInpt, df=encounters_inpt_df),
         ],
     )
 

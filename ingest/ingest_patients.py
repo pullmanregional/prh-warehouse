@@ -69,6 +69,7 @@ def read_patients(csv_file: str):
             "zip",
             "phone",
             "email",
+            "pcp",
         ],
         dtype={
             "prw_id": str,
@@ -81,6 +82,7 @@ def read_patients(csv_file: str):
             "zip": str,
             "phone": str,
             "email": str,
+            "pcp": str,
         },
         parse_dates=["dob"],
         index_col=False,

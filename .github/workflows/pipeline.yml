@@ -48,3 +48,24 @@ jobs:
           pushd ingest && pipenv run python main.py
         env:
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
+
+  run-ingest-datamarts:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Trigger datamart ingest workflows
+        run: |
+          pushd pipeline
+          npm install && node trigger_workflows.js \
+            "prh-warehouse/datamart-ingest" \
+            "prh-warehouse/datamart-marketing" \
+            "prh-warehouse/datamart-panel" \
+            "prh-warehouse/datamart-finance" \
+            "prh-warehouse/datamart-residency" \
+            "prh-warehouse/datamart-rvupeds"
+
+        env:
+          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
+        

@@ -45,20 +45,11 @@ GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY")
 # Path to ../ingest/, where actual ingest subflow code is located
 INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
 
-# Datamart ingest workflow names to execute as part of the ingest process
-DATAMART_WORKFLOWS = [
-    {"name": "datamart-marketing", "repo": "prh-warehouse"},
-    {"name": "datamart-panel", "repo": "prh-warehouse"},
-    {"name": "datamart-finance", "repo": "prh-warehouse"},
-    {"name": "datamart-residency", "repo": "prh-warehouse"},
-    {"name": "datamart-rvupeds", "repo": "prh-warehouse"},
-]
-
 
 # -----------------------------------------
 # Main ingest pipeline
 # -----------------------------------------
-async def run_pipeline(run_ingest=True, run_transform=True, run_datamart=True):
+async def run_pipeline(run_ingest=True, run_transform=True):
     # Create/update the venv which is used by all scripts in ../ingest/
     # The PIPENV_IGNORE_VIRTUALENVS env var instructs pipenv to install dependencies
     # from the Pipfile in the current directory (../ingest) into the current
@@ -91,10 +82,6 @@ async def run_pipeline(run_ingest=True, run_transform=True, run_datamart=True):
         # After ingest flows are complete, run transform flows, which calculate
         # additional common columns that will be used across multiple applications
         await run_parallel(transform_patient_panel)
-
-    if run_datamart:
-        # Lastly create datamarts for each application
-        await datamart_ingest()
 
 
 # -----------------------------------------
@@ -166,19 +153,6 @@ async def transform_patient_panel():
 
 
 # -----------------------------------------
-# Datamart ingest
-# -----------------------------------------
-def datamart_ingest():
-    """Ask Prefect to start all datamart flows by names defined in DATAMART_DEPLOYMENTS"""
-    # Kick off flow runs for each deployment.
-    # timeout=0 means return immediately without waiting for the flow to complete.
-    # as_subflow=False means run the flow as a top-level flow, not as a subflow.
-    for workflow in DATAMART_WORKFLOWS:
-        print(f"Triggering datamart workflow: {workflow['name']}")
-        trigger_workflow(workflow)
-
-
-# -----------------------------------------
 # Utility functions
 # -----------------------------------------
 async def run_parallel(*fns, max_parallel=3):
@@ -224,34 +198,6 @@ async def shell_op(cmd, env=None, cwd=None, cmd_name=""):
     return await process.wait()
 
 
-def trigger_workflow(workflow: dict[str, str], timeout_secs: float = 0) -> int | None:
-    """
-    Triggers a GitHub Actions workflow and returns the run ID.
-    Returns the run ID if successfully started, None if timeout.
-    """
-    # Get the runs for the givenworkflow
-    repository = Github(GITHUB_TOKEN).get_repo(workflow["repo"])
-    workflow = repository.get_workflow(f"{workflow['name']}.yml")
-    runs = workflow.get_runs(per_page=1)
-    latest_run = next(runs, None)
-
-    # Trigger a new run
-    workflow.create_dispatch(workflow.get("branch", "main"))
-
-    # Poll every 15 seconds for a new run to appear
-    start_time = time.time()
-    while timeout_secs == 0 or (time.time() - start_time < timeout_secs):
-        time.sleep(15)
-
-        # Look for new run ID
-        runs = workflow.get_runs(per_page=1)
-        current_run = next(runs, None)
-        if current_run and (latest_run is None or current_run.id != latest_run.id):
-            return current_run.id
-
-    return None
-
-
 # -----------------------------------------
 # Main entry point
 # -----------------------------------------
@@ -266,33 +212,26 @@ def main():
     parser.add_argument(
         "--ingest",
         action="store_true",
-        help="Ingest data. Ingest, transform, and datamarts stages will all run if none are set.",
+        help="Ingest data. Ingest, transform stages will run if none are set.",
     )
     parser.add_argument(
         "--transform",
         action="store_true",
-        help="Run transforms. Ingest, transform, and datamarts stages will all run if none are set.",
-    )
-    parser.add_argument(
-        "--datamarts",
-        action="store_true",
-        help="Run datamart ingest. Ingest, transform, and datamarts stages will all run if none are set.",
+        help="Run transforms. Ingest, transform stages will run if none are set.",
     )
 
     args = parser.parse_args()
 
     # Determine which subflows to run based on command line args
-    run_all = not args.ingest and not args.transform and not args.datamarts
+    run_all = not args.ingest and not args.transform
     run_ingest = run_all or args.ingest
     run_transform = run_all or args.transform
-    run_datamart = run_all or args.datamarts
 
     # Run the main ingest flow
     asyncio.run(
         run_pipeline(
             run_ingest=run_ingest,
             run_transform=run_transform,
-            run_datamart=run_datamart,
         )
     )
 

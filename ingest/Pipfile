@@ -9,6 +9,8 @@ openpyxl = "*"
 cryptography = "*"
 pandas = "*"
 pyodbc = "*"
+pygithub = "*"
+python-dotenv = "*"
 
 [requires]
 python_version = "3"

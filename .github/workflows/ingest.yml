@@ -1,4 +1,4 @@
-name: Ingest
+name: "* Ingest Source Data"
 
 on:
   workflow_dispatch:
@@ -8,29 +8,15 @@ permissions:
   contents: read
 
 jobs:
-  run-sources-epic:
+  run-ingest-sources:
     runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Execute sources-epic
+      - name: Ingest source data
         run: |
-          cd pipeline
-          npm install && node trigger_workflows.js sources-epic
+          env
+          pushd ingest && pipenv run python main.py
         env:
-          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
-
-  await-sources-epic:
-    runs-on: self-hosted
-    needs: run-sources-epic
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Poll for sources-epic completion
-        run: |
-          cd pipeline
-          npm install && node poll_workflows.js sources-epic
-        env:
-          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
+          PRW_ENV: ${{ env.PRW_ENV || 'prod' }}

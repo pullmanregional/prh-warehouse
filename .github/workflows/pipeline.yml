@@ -45,9 +45,14 @@ jobs:
       - name: Ingest source data
         run: |
           env
-          pushd ingest && pipenv run python main.py
+          pushd ingest
+          pipenv install && pipenv run python main.py
         env:
+          PIPENV_CUSTOM_VENV_NAME: "prh-warehouse"
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
+          PRW_HOME: ${{ env.PRW_HOME || '.' }}
+          PRW_CONN: ${{ secrets.PRW_CONN }}
+          PRW_ID_CONN: ${{ secrets.PRW_ID_CONN }}
 
   run-ingest-datamarts:
     runs-on: self-hosted

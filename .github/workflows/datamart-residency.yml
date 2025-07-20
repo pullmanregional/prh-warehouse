@@ -1,4 +1,4 @@
-name: Datamart Ingest - Peds RVU
+name: Datamart Ingest - Residency
 
 on:
   workflow_dispatch:

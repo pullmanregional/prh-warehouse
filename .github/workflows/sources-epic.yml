@@ -1,4 +1,4 @@
-name: Sources Epic
+name: Export Source - Epic
 
 on:
   workflow_dispatch:

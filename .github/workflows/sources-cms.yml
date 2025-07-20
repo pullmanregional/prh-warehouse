@@ -17,6 +17,5 @@ jobs:
 
       - name: Run script
         run: |
-          cd prw-exporter/sources/cms
-          pwd
+          pushd prw-exporter/sources/cms
           ./fetch-pfs.sh --out /home/prefect/Sources/cms/

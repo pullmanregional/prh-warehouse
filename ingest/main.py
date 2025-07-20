@@ -16,8 +16,6 @@ import sys
 import pathlib
 import asyncio
 import argparse
-import time
-from github import Github
 
 # Import from prw_common, which requires that we add the parent dir to the path
 sys.path.append("..")
@@ -59,7 +57,6 @@ async def run_pipeline(run_ingest=True, run_transform=True):
         cwd=INGEST_CODE_ROOT,
         cmd_name="pipenv_install",
         env={
-            "PIPENV_IGNORE_VIRTUALENVS": "1",
             "PIPENV_CUSTOM_VENV_NAME": "prh-warehouse",
         },
     )
@@ -146,7 +143,7 @@ async def ingest_finance():
 # -----------------------------------------
 async def transform_patient_panel():
     return await shell_op(
-        cmd=f'pipenv run python transform_patient_panel.py -prw "{PRW_CONN}"',
+        cmd=f'pipenv run python transform_patient_panel.py --prw "{PRW_CONN}"',
         cwd=INGEST_CODE_ROOT,
         cmd_name="transform_patient_panel",
     )
@@ -166,7 +163,7 @@ async def run_parallel(*fns, max_parallel=3):
     return await asyncio.gather(*[call_with_semaphore(fn) for fn in fns])
 
 
-async def shell_op(cmd, env=None, cwd=None, cmd_name=""):
+async def shell_op(cmd, env=None, cwd=None, cmd_name="") -> int:
     """
     Run a shell command and return the result. Output from subprocesses
     is combined into main process stdout.
@@ -195,7 +192,10 @@ async def shell_op(cmd, env=None, cwd=None, cmd_name=""):
         prefix_output(process.stderr),
     )
 
-    return await process.wait()
+    exit_code = await process.wait()
+    if exit_code != 0:
+        raise Exception(f"'{cmd_name}' failed with exit code {exit_code}")
+    return exit_code
 
 
 # -----------------------------------------

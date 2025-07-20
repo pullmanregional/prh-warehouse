@@ -59,12 +59,8 @@ jobs:
         run: |
           pushd pipeline
           npm install && node trigger_workflows.js \
-            "prh-warehouse/datamart-ingest" \
-            "prh-warehouse/datamart-marketing" \
-            "prh-warehouse/datamart-panel" \
-            "prh-warehouse/datamart-finance" \
-            "prh-warehouse/datamart-residency" \
-            "prh-warehouse/datamart-rvupeds"
+            "datamart-residency" \
+            "datamart-rvupeds" \
 
         env:
           GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}

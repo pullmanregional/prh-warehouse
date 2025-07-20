@@ -12,15 +12,11 @@ Datamart flows to execute are defined in the DATAMART_WORKFLOWS constant
 """
 
 import os
-import sys
 import pathlib
 import asyncio
 import argparse
-
-# Import from prw_common, which requires that we add the parent dir to the path
-sys.path.append("..")
-from ingest.prw_common.env_utils import load_prw_env
-from ingest.prw_common.db_utils import mask_conn_pw
+from prw_common.env_utils import load_prw_env
+from prw_common.db_utils import mask_conn_pw
 
 # Load env vars from the .env file corresponding to PRW_ENV (dev/prod)
 PRW_ENV = load_prw_env(__file__)

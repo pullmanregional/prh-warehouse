@@ -1,0 +1,32 @@
+name: Datamart Ingest - Residency
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-datamart-rvupeds:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout prw-exporter
+        uses: actions/checkout@v4
+        with:
+          repository: pullmanregional/streamlit
+          token: ${{ secrets.DEPLOY_PAT }}
+          path: prh-streamlit
+          submodules: true
+
+      - name: Run ingest
+        run: |
+          pushd prh-streamlit/residency
+
+          # Load env vars based on environment designated in PRW_ENV
+          set -a; source prefect/.env.$PRW_ENV
+
+          # Run script
+          pipenv install && pipenv run python prefect/ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_RESIDENCY_ENCRYPTED_DB_FILE}" --key "${PRH_RESIDENCY_DATA_KEY}"
+        env:
+          PIPENV_CUSTOM_VENV_NAME: "prh-streamlit-residency"
+          PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
+          PRW_HOME: ${{ env.PRW_HOME || '.' }}
+          PRW_CONN: ${{ secrets.PRW_CONN_RO }}
+          PRH_RESIDENCY_DATA_KEY: ${{ secrets.PRH_RESIDENCY_DATA_KEY }}

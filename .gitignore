@@ -16,8 +16,5 @@ ads/obj
 node_modules
 package-lock.json
 
-# act settings (local GitHub Actions)
-.secrets.act
-
 # OS
 .DS_Store

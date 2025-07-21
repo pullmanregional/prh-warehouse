@@ -1,4 +1,4 @@
-name: Export Source - CMS
+name: Sources CMS
 
 on:
   workflow_dispatch:
@@ -17,5 +17,6 @@ jobs:
 
       - name: Run script
         run: |
-          pushd prw-exporter/sources/cms
+          cd prw-exporter/sources/cms
+          pwd
           ./fetch-pfs.sh --out /home/prefect/Sources/cms/

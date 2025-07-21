@@ -331,7 +331,7 @@ def transform_add_peds_panels(src: SrcData):
 
     logging.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
     print(
-        "\nPeds Data Sample:\n-----------------------------------------------------------------------------------\n",
+        "\nData Sample:\n-----------------------------------------------------------------------------------\n",
         src.patients_df[src.patients_df["panel_location"].notna()][
             ["prw_id", "panel_location", "panel_provider", "assignment_details"]
         ].head(),

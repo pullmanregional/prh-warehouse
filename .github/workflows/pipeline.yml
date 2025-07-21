@@ -1,0 +1,78 @@
+name: "* Warehouse Pipeline"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  run-sources-epic:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Trigger sources-epic to extract data from Epic
+        run: |
+          pushd pipeline
+          npm install && node trigger_workflows.js sources-epic
+        env:
+          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
+
+  await-sources-epic:
+    runs-on: self-hosted
+    needs: run-sources-epic
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for sources-epic completion
+        run: |
+          pushd pipeline
+          npm install && node poll_workflows.js sources-epic
+        env:
+          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
+  
+  run-ingest-sources:
+    runs-on: self-hosted
+    needs: await-sources-epic
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Ingest source data
+        run: |
+          pushd ingest
+
+          # Load env vars based on environment designated in PRW_ENV
+          set -a; source .env.$PRW_ENV
+          env
+          
+          uv run python main.py
+        env:
+          PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
+          PRW_HOME: ${{ env.PRW_HOME || '.' }}
+          PRW_CONN: ${{ secrets.PRW_CONN }}
+          PRW_ID_CONN: ${{ secrets.PRW_ID_CONN }}
+
+  run-ingest-datamarts:
+    runs-on: self-hosted
+    needs: run-ingest-sources
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Trigger datamart ingest workflows
+        run: |
+          pushd pipeline
+          npm install && node trigger_workflows.js \
+            "datamart-residency" \
+            "datamart-rvupeds" \
+
+        env:
+          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
+        

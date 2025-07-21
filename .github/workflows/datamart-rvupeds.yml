@@ -1,4 +1,4 @@
-name: Datamart Ingest - Residency
+name: Datamart Ingest - Peds RVU
 
 on:
   workflow_dispatch:
@@ -17,18 +17,18 @@ jobs:
 
       - name: Run ingest
         run: |
-          pushd prh-streamlit/residency/ingest
+          pushd prh-streamlit/rvupeds/ingest
 
           # Load env vars based on environment designated in PRW_ENV
           set -a; source .env.${PRW_ENV}
 
           # Run script
-          uv run python ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_RESIDENCY_ENCRYPTED_DB_FILE}" --key "${PRH_RESIDENCY_DATA_KEY}"
+          uv run python ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_RVUPEDS_ENCRYPTED_DB_FILE}" --key "${PRH_RVUPEDS_DATA_KEY}" --s3url "${S3_DATASET_URL}" --s3auth "${S3_DATASET_AUTH}"
         env:
-          PIPENV_CUSTOM_VENV_NAME: "prh-streamlit-residency"
+          PIPENV_CUSTOM_VENV_NAME: "prh-streamlit-rvupeds"
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PRW_HOME: ${{ env.PRW_HOME || '.' }}
           PRW_CONN: ${{ secrets.PRW_CONN_RO }}
           S3_DATASET_URL: ${{ secrets.S3_DATASET_URL }}
           S3_DATASET_AUTH: ${{ secrets.S3_DATASET_AUTH }}
-          PRH_RESIDENCY_DATA_KEY: ${{ secrets.PRH_RESIDENCY_DATA_KEY }}
+          PRH_RVUPEDS_DATA_KEY: ${{ secrets.PRH_RVUPEDS_DATA_KEY }}

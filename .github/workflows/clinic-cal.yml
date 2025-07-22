@@ -1,6 +1,11 @@
 name: Clinic-Cal Ingest - Epic Availability
 
 on:
+  # Run daily at 15:00 UTC which is 07:00 PST or 08:00 PDT
+  # PST is UTC-8 (Nov to Mar) and PDT is UTC-7 (Mar to Nov)
+  # No timezone support for GH Actions yet. See https://github.com/orgs/community/discussions/13454
+  schedule:
+    - cron: '0 15 * * *'
   workflow_dispatch:
 
 jobs:

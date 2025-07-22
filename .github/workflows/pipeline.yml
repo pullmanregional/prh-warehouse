@@ -1,6 +1,11 @@
 name: "* Main - Full Ingest Pipeline"
 
 on:
+  # Run daily at 13:00 UTC which is 05:00 PST or 06:00 PDT
+  # PST is UTC-8 (Nov to Mar) and PDT is UTC-7 (Mar to Nov)
+  # No timezone support for GH Actions yet. See https://github.com/orgs/community/discussions/13454
+  schedule:
+    - cron: '0 13 * * *'
   workflow_dispatch:
     inputs:
       run_sources_epic:
@@ -18,10 +23,18 @@ on:
         required: false
         default: true
         type: boolean
+      run_reports:
+        description: 'Run reports (reports.yml)'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   actions: write
   contents: read
+
+env:
+  GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
 
 jobs:
   run-sources-epic:
@@ -31,12 +44,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trigger sources-epic to extract data from Epic
-        if: ${{ inputs.run_sources_epic }}
+        if: ${{ github.event_name == 'schedule' || inputs.run_sources_epic }}
         run: |
           pushd pipeline
           npm install && node trigger_workflows.js sources-epic
-        env:
-          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
 
   await-sources-epic:
     runs-on: self-hosted
@@ -46,12 +57,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Wait for sources-epic completion
-        if: ${{ inputs.run_sources_epic }}
+        if: ${{ github.event_name == 'schedule' || inputs.run_sources_epic }}
         run: |
           pushd pipeline
           npm install && node poll_workflows.js sources-epic
-        env:
-          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
   
   run-ingest-sources:
     runs-on: self-hosted
@@ -61,12 +70,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trigger main ingest workflow
-        if: ${{ inputs.run_ingest_sources }}
+        if: ${{ github.event_name == 'schedule' || inputs.run_ingest_sources }}
         run: |
           pushd pipeline
           npm install && node trigger_workflows.js ingest
-        env:
-          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
 
   await-ingest-sources:
     runs-on: self-hosted
@@ -76,12 +83,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Wait for ingest workflow completion
-        if: ${{ inputs.run_ingest_sources }}
+        if: ${{ github.event_name == 'schedule' || inputs.run_ingest_sources }}
         run: |
           pushd pipeline
           npm install && node poll_workflows.js ingest
-        env:
-          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
 
   run-ingest-datamarts:
     runs-on: self-hosted
@@ -91,7 +96,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trigger datamart ingest workflows
-        if: ${{ inputs.run_ingest_datamarts }}
+        if: ${{ github.event_name == 'schedule' || inputs.run_ingest_datamarts }}
         run: |
           pushd pipeline
           npm install && node trigger_workflows.js \
@@ -101,6 +106,15 @@ jobs:
             "datamart-marketing" \
             "datamart-finance"
 
-        env:
-          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
-        
+  run-reports:
+    runs-on: self-hosted
+    needs: await-ingest-sources
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Trigger reports workflow
+        if: ${{ github.event_name == 'schedule' || inputs.run_reports }}
+        run: |
+          pushd pipeline
+          npm install && node trigger_workflows.js reports

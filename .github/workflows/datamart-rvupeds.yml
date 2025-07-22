@@ -25,7 +25,6 @@ jobs:
           # Run script
           uv run python ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_RVUPEDS_ENCRYPTED_DB_FILE}" --key "${PRH_RVUPEDS_DATA_KEY}" --s3url "${S3_DATASET_URL}" --s3auth "${S3_DATASET_AUTH}"
         env:
-          PIPENV_CUSTOM_VENV_NAME: "prh-streamlit-rvupeds"
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PRW_HOME: ${{ env.PRW_HOME || '.' }}
           PRW_CONN: ${{ secrets.PRW_CONN_RO }}

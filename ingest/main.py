@@ -47,17 +47,17 @@ async def run_pipeline(run_ingest=True, run_transform=True):
 
         # Other
         await run_parallel(
-            ingest_encounters,
-            ingest_finance,
-            ingest_imaging,
-            ingest_notes,
-            ingest_charges,
+            ingest_encounters(),
+            ingest_finance(),
+            ingest_imaging(),
+            ingest_notes(),
+            ingest_charges(),
         )
 
     if run_transform:
         # After ingest flows are complete, run transform flows, which calculate
         # additional common columns that will be used across multiple applications
-        await run_parallel(transform_patient_panel)
+        await run_parallel(transform_patient_panel())
 
 
 # -----------------------------------------
@@ -131,15 +131,21 @@ async def transform_patient_panel():
 # -----------------------------------------
 # Utility functions
 # -----------------------------------------
-async def run_parallel(*fns, max_parallel=3):
+async def run_parallel(*coroutines, max_parallel=3):
     """Run async functions in parallel, but limit concurrency to max_parallel"""
+    
+    # Await each coroutine to complete execution within a critical section to limit concurrency
     sem = asyncio.Semaphore(max_parallel)
-
-    async def call_with_semaphore(fn):
+    async def sem_task(coroutine):
         async with sem:
-            return await fn()
+            # Print the name of the function, then schedule and await completion of function
+            print(f"Starting task: {coroutine.__name__}")
+            await coroutine
+            print(f"Task complete: {coroutine.__name__}")
 
-    return await asyncio.gather(*[call_with_semaphore(fn) for fn in fns])
+    # The call to fn() returns a coroutine in run_parallel(fn()). The coroutine needs to be
+    # scheduled in order to actually execute. asyncio.gather() schedules the coroutines for execution.
+    return await asyncio.gather(*[sem_task(c) for c in coroutines])
 
 
 async def shell_op(cmd, env=None, cwd=None, cmd_name="") -> int:

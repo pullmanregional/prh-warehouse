@@ -500,7 +500,7 @@ def transform_add_other_panels(src: SrcData):
     print(
         "\nData Sample:\n-----------------------------------------------------------------------------------\n",
         src.patients_df.loc[
-            unassigned_mask,
+            unassigned_mask & (src.patients_df["panel_location"].notna()),
             ["prw_id", "panel_location", "panel_provider", "assignment_details"],
         ].head(),
         "\n-----------------------------------------------------------------------------------\n",

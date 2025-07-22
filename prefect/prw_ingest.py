@@ -126,7 +126,7 @@ async def prw_ingest_finance(drop_tables=False):
 @flow
 async def prw_transform_patient_panel():
     return await shell_op(
-        command=f'pipenv run python transform_patient_panel.py -prw "{PRW_CONN}"',
+        command=f'pipenv run python transform_patient_panel.py --prw "{PRW_CONN}"',
         cwd=INGEST_CODE_ROOT,
     )
 

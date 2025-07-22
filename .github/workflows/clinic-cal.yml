@@ -1,0 +1,23 @@
+name: Clinic-Cal Ingest - Epic Availability
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-clinic-cal-ingest:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout prw-exporter
+        uses: actions/checkout@v4
+        with:
+          repository: jonjlee/clinic-cal
+          token: ${{ secrets.CLINIC_CAL_RO_PAT }}
+          path: clinic-cal
+
+      - name: Run ingest
+        run: |
+          pushd clinic-cal
+
+          # Load env vars from project, then run script
+          set -a; source epic/.env
+          npm install && node epic/ingest-provider-schedule.cjs -f "${CLINIC_CAL_EPIC_SOURCE_FILE}" -out "${CLINIC_CAL_EPIC_URL}"

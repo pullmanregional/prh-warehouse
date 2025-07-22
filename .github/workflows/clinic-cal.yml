@@ -7,7 +7,7 @@ jobs:
   run-clinic-cal-ingest:
     runs-on: self-hosted
     steps:
-      - name: Checkout prw-exporter
+      - name: Checkout project
         uses: actions/checkout@v4
         with:
           repository: jonjlee/clinic-cal

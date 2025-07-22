@@ -2,6 +2,22 @@ name: "* Main - Full Ingest Pipeline"
 
 on:
   workflow_dispatch:
+    inputs:
+      run_sources_epic:
+        description: 'Run sources-epic.yml to extract Epic data'
+        required: false
+        default: true
+        type: boolean
+      run_ingest_sources:
+        description: 'Run ingest-sources.yml to ingest source data'
+        required: false
+        default: true
+        type: boolean
+      run_ingest_datamarts:
+        description: 'Run ingest-datamarts.yml to trigger datamart ingest workflows'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   actions: write
@@ -15,6 +31,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trigger sources-epic to extract data from Epic
+        if: ${{ inputs.run_sources_epic }}
         run: |
           pushd pipeline
           npm install && node trigger_workflows.js sources-epic
@@ -29,6 +46,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Wait for sources-epic completion
+        if: ${{ inputs.run_sources_epic }}
         run: |
           pushd pipeline
           npm install && node poll_workflows.js sources-epic
@@ -45,6 +63,7 @@ jobs:
           submodules: true
 
       - name: Ingest source data
+        if: ${{ inputs.run_ingest_sources }}
         run: |
           pushd ingest
 
@@ -67,6 +86,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trigger datamart ingest workflows
+        if: ${{ inputs.run_ingest_datamarts }}
         run: |
           pushd pipeline
           npm install && node trigger_workflows.js \

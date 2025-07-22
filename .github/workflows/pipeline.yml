@@ -59,28 +59,33 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
-      - name: Ingest source data
+      - name: Trigger main ingest workflow
         if: ${{ inputs.run_ingest_sources }}
         run: |
-          pushd ingest
-
-          # Load env vars based on environment designated in PRW_ENV
-          set -a; source .env.$PRW_ENV
-          env
-          
-          uv run python main.py
+          pushd pipeline
+          npm install && node trigger_workflows.js ingest
         env:
-          PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
-          PRW_HOME: ${{ env.PRW_HOME || '.' }}
-          PRW_CONN: ${{ secrets.PRW_CONN }}
-          PRW_ID_CONN: ${{ secrets.PRW_ID_CONN }}
+          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
+
+  await-ingest-sources:
+    runs-on: self-hosted
+    needs: run-ingest-sources
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for ingest workflow completion
+        if: ${{ inputs.run_ingest_sources }}
+        run: |
+          pushd pipeline
+          npm install && node poll_workflows.js ingest
+        env:
+          GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}
 
   run-ingest-datamarts:
     runs-on: self-hosted
-    needs: run-ingest-sources
+    needs: await-ingest-sources
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

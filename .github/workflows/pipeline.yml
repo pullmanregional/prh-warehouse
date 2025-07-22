@@ -4,17 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       run_sources_epic:
-        description: 'Run sources-epic.yml to extract Epic data'
+        description: 'Extract Epic data (sources-epic.yml)'
         required: false
         default: true
         type: boolean
       run_ingest_sources:
-        description: 'Run ingest-sources.yml to ingest source data'
+        description: 'Ingest source data (ingest/main.py)'
         required: false
         default: true
         type: boolean
       run_ingest_datamarts:
-        description: 'Run ingest-datamarts.yml to trigger datamart ingest workflows'
+        description: 'Trigger datamart workflows(datamart-*.yml)'
         required: false
         default: true
         type: boolean

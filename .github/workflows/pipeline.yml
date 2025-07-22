@@ -19,7 +19,7 @@ on:
         default: true
         type: boolean
       run_ingest_datamarts:
-        description: 'Trigger datamart workflows(datamart-*.yml)'
+        description: 'Trigger datamart ingest (datamart-*.yml)'
         required: false
         default: true
         type: boolean

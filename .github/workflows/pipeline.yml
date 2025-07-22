@@ -1,4 +1,4 @@
-name: "* Warehouse Pipeline"
+name: "* Ingest - Full Pipeline"
 
 on:
   workflow_dispatch:

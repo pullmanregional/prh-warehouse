@@ -1,4 +1,4 @@
-name: "* Ingest - Full Pipeline"
+name: "* Main - Full Ingest Pipeline"
 
 on:
   workflow_dispatch:
@@ -72,6 +72,9 @@ jobs:
           npm install && node trigger_workflows.js \
             "datamart-residency" \
             "datamart-rvupeds" \
+            "datamart-panel" \
+            "datamart-marketing" \
+            "datamart-finance"
 
         env:
           GH_AUTH_TOKEN: ${{ secrets.DEPLOY_PAT }}

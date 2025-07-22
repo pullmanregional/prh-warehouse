@@ -1,4 +1,4 @@
-name: "* Ingest - Ingest Sources Only"
+name: "* Main - Ingest Sources Only"
 
 on:
   workflow_dispatch:

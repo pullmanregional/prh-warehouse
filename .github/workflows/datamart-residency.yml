@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-datamart-rvupeds:
+  run-datamart-residency:
     runs-on: self-hosted
     steps:
       - name: Checkout prw-exporter
@@ -23,7 +23,7 @@ jobs:
           set -a; source .env.${PRW_ENV}
 
           # Run script
-          uv run python ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_RESIDENCY_ENCRYPTED_DB_FILE}" --key "${PRH_RESIDENCY_DATA_KEY}"
+          uv run python ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_RESIDENCY_ENCRYPTED_DB_FILE}" --key "${PRH_RESIDENCY_DATA_KEY}" --s3url "${S3_DATASET_URL}" --s3auth "${S3_DATASET_AUTH}"
         env:
           PIPENV_CUSTOM_VENV_NAME: "prh-streamlit-residency"
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}

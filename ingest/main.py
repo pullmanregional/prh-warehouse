@@ -15,6 +15,7 @@ import os
 import pathlib
 import asyncio
 import argparse
+import time
 from prw_common.db_utils import mask_conn_pw
 
 # Load config from env vars into constants. The caller needs to preload these by running `source .env.${PRW_ENV}`.
@@ -140,8 +141,9 @@ async def run_parallel(*coroutines, max_parallel=3):
         async with sem:
             # Print the name of the function, then schedule and await completion of function
             print(f"Starting task: {coroutine.__name__}")
+            start_time = time.time()
             await coroutine
-            print(f"Task complete: {coroutine.__name__}")
+            print(f"Task complete: {coroutine.__name__} - {time.time() - start_time:.2f}s")
 
     # The call to fn() returns a coroutine in run_parallel(fn()). The coroutine needs to be
     # scheduled in order to actually execute. asyncio.gather() schedules the coroutines for execution.

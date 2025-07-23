@@ -24,7 +24,7 @@ jobs:
           set -a; source .env.$PRW_ENV
           env
           
-          uv run python ingest_patients.py -i "{PRW_EPIC_SOURCE_DIR}" --prw "{PRW_CONN}" --prwid "{PRW_ID_CONN}"
+          uv run python ingest_patients.py -i "${PRW_EPIC_SOURCE_DIR}" --prw "${PRW_CONN}" --prwid "${PRW_ID_CONN}"
         env:
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PRW_HOME: ${{ env.PRW_HOME || '.' }}

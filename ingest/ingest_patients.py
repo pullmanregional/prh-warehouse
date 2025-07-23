@@ -31,18 +31,25 @@ logging.basicConfig(level=logging.INFO)
 # -------------------------------------------------------
 # Extract from Source Files
 # -------------------------------------------------------
-def sanity_check_files(patients_file, mychart_file, allergy_file):
+def line_count(file_path):
+    with open(file_path, "rb") as f:
+        return sum(1 for _ in f)
+
+
+def sanity_check_files(patients_file, mychart_file, allergy_file, problem_list_file):
     """
     Executed once at the beginning of ingest to validate CSV file
     meets basic requirements.
     """
     error = None
-    if not os.path.isfile(patients_file):
-        error = f"ERROR: patients file does not exist: {patients_file}"
-    elif not os.path.isfile(mychart_file):
-        error = f"ERROR: mychart file does not exist: {mychart_file}"
-    elif not os.path.isfile(allergy_file):
-        error = f"ERROR: allergy file does not exist: {allergy_file}"
+    if not os.path.isfile(patients_file) or line_count(patients_file) < 10000:
+        error = f"ERROR: invalid patients file: {patients_file}"
+    elif not os.path.isfile(mychart_file) or line_count(mychart_file) < 10000:
+        error = f"ERROR: invalid mychart file: {mychart_file}"
+    elif not os.path.isfile(allergy_file) or line_count(allergy_file) < 10000:
+        error = f"ERROR: invalid allergy file: {allergy_file}"
+    elif not os.path.isfile(problem_list_file) or line_count(problem_list_file) < 10000:
+        error = f"ERROR: invalid problem list file: {problem_list_file}"
     if error is not None:
         print(error)
 
@@ -127,6 +134,47 @@ def read_allergy(allergy_file: str, mrn_to_prw_id_df: pd.DataFrame):
     return allergy_df
 
 
+def read_problem_list(problem_list_file: str, mrn_to_prw_id_df: pd.DataFrame):
+    """
+    Read problem lists file and add info into patients_df
+    """
+    logging.info(f"Reading {problem_list_file}")
+    problem_list_df = pd.read_csv(
+        problem_list_file,
+        skiprows=1,
+        index_col=False,
+        names=[
+            "mrn",
+            "diagnosis",
+            "icd",
+            "start_date",
+            "end_date",
+            "status",
+            "is_cancer",
+        ],
+        dtype={
+            "mrn": str,
+            "start_date": str,
+        },
+    )
+
+    # Keep only active problems
+    problem_list_df = problem_list_df[problem_list_df["status"] == "Active"]
+
+    # Group by MRN, and merge data into a json string
+    problem_list_df = (
+        problem_list_df.groupby("mrn")[["diagnosis", "icd", "start_date"]]
+        .apply(lambda x: x.to_json(orient="records"))
+        .reset_index(name="problem_list")
+    )
+
+    # Convert MRN to prw_id
+    problem_list_df = problem_list_df.merge(mrn_to_prw_id_df, on="mrn", how="right")
+    problem_list_df.drop(columns=["mrn"], inplace=True)
+
+    return problem_list_df
+
+
 def read_mychart_status(mychart_file: str, mrn_to_prw_id_df: pd.DataFrame):
     """
     Read mychart file and add info into patients_df
@@ -182,6 +230,7 @@ def calc_patient_age(patients_df: pd.DataFrame):
         (now.month == dob_df.dt.month) & (now.day < dob_df.dt.day)
     )
     patients_df.loc[mask, "age"] -= 1
+    patients_df["age"] = patients_df["age"].astype("Int64")
 
     # Calculate age in months, but only retain if under 3
     patients_df["age_in_mo_under_3"] = (
@@ -256,9 +305,12 @@ def main():
     patients_file = os.path.join(in_path, "patients.csv")
     mychart_file = os.path.join(in_path, "mychart.csv")
     allergy_file = os.path.join(in_path, "allergy.csv")
+    problem_list_file = os.path.join(in_path, "problem-list.csv")
 
     # Sanity check the input file
-    if not sanity_check_files(patients_file, mychart_file, allergy_file):
+    if not sanity_check_files(
+        patients_file, mychart_file, allergy_file, problem_list_file
+    ):
         logging.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
@@ -266,9 +318,11 @@ def main():
     patients_df, mrn_to_prw_id_df = read_patients(patients_file)
     mychart_df = read_mychart_status(mychart_file, mrn_to_prw_id_df)
     allergy_df = read_allergy(allergy_file, mrn_to_prw_id_df)
+    problem_list_df = read_problem_list(problem_list_file, mrn_to_prw_id_df)
 
-    # Add allergy data to patients_df
+    # Add allergies and problem lists to patients_df
     patients_df = patients_df.merge(allergy_df, on="prw_id", how="left")
+    patients_df = patients_df.merge(problem_list_df, on="prw_id", how="left")
 
     # Transform data: only data correction and partitioning of PHI into separate DB.
     # All other data transformations should be done by later flows in the pipeline.

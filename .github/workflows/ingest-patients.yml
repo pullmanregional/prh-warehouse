@@ -1,0 +1,32 @@
+name: "Source Ingest - Patients"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  run-ingest-patients:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Run
+        run: |
+          pushd ingest
+
+          # Load env vars based on environment designated in PRW_ENV
+          set -a; source .env.$PRW_ENV
+          env
+          
+          uv run python ingest_patients.py -i "{PRW_EPIC_SOURCE_DIR}" --prw "{PRW_CONN}" --prwid "{PRW_ID_CONN}"
+        env:
+          PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
+          PRW_HOME: ${{ env.PRW_HOME || '.' }}
+          PRW_CONN: ${{ secrets.PRW_CONN }}
+          PRW_ID_CONN: ${{ secrets.PRW_ID_CONN }}

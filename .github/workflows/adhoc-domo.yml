@@ -1,4 +1,4 @@
-name: Report Adhoc - DOMO
+name: Reports Adhoc - DOMO
 
 on:
   workflow_dispatch:

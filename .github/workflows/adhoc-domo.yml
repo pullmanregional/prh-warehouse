@@ -5,7 +5,7 @@ on:
     inputs:
       month:
         description: "Month to update in format YYYYMM (eg 202501)"
-        required: false
+        required: true
         type: string
 
 jobs:

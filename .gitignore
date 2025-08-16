@@ -3,6 +3,7 @@ __pycache__
 
 # Data files
 ingest/data/*
+/prh-*.json
 *.sqlite3
 *.xlsx
 *.tsv

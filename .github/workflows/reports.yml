@@ -31,6 +31,5 @@ jobs:
           [ -n "${{ inputs.sql_script_to_run }}" ] && SCRIPT_FLAG="--script ${{ inputs.sql_script_to_run }}"
           uv run python run_sql_scripts.py --prw "$PRW_CONN" --out "$PRH_REPORTS_OUTPUT_PATH" $SCRIPT_FLAG
         env:
-          PIPENV_CUSTOM_VENV_NAME: "prw-exporter"
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PRW_CONN: ${{ secrets.PRW_CONN_RO }}

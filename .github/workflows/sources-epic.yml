@@ -31,7 +31,6 @@ jobs:
           [ -n "${{ inputs.sql_script_to_run }}" ] && SCRIPT_FLAG="--script ${{ inputs.sql_script_to_run }}"
           uv run python run_sql_scripts.py --caboodle "$CABOODLE_CONN" --clarity "$CLARITY_CONN" --out "$PRH_SOURCES_EPIC_OUTPUT_PATH" $SCRIPT_FLAG
         env:
-          PIPENV_CUSTOM_VENV_NAME: "prw-exporter"
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           CABOODLE_CONN: ${{ secrets.CABOODLE_CONN }}
           CLARITY_CONN: ${{ secrets.CLARITY_CONN }}

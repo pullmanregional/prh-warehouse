@@ -10,14 +10,14 @@ jobs:
       - name: Checkout prw-exporter
         uses: actions/checkout@v4
         with:
-          repository: pullmanregional/streamlit
+          repository: pullmanregional/dashboards
           token: ${{ secrets.DEPLOY_PAT }}
-          path: prh-streamlit
+          path: prh-dashboards
           submodules: true
 
       - name: Run ingest
         run: |
-          pushd prh-streamlit/rvupeds/ingest
+          pushd prh-dashboards/rvupeds/ingest
 
           # Load env vars based on environment designated in PRW_ENV
           set -a; source .env.${PRW_ENV}

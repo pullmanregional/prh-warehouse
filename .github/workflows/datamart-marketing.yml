@@ -17,7 +17,7 @@ jobs:
 
       - name: Run ingest
         run: |
-          pushd prh-dashboards/marketing/ingest
+          pushd prh-dashboards/streamlit/marketing/ingest
 
           # Load env vars based on environment designated in PRW_ENV
           set -a; source .env.${PRW_ENV}

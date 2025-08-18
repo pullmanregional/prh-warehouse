@@ -12,12 +12,12 @@ jobs:
         with:
           repository: pullmanregional/dashboards
           token: ${{ secrets.DEPLOY_PAT }}
-          path: prh-da
+          path: prh-dashboards
           submodules: true
 
       - name: Run ingest
         run: |
-          pushd prh-dashboards/finance/ingest
+          pushd prh-dashboards/streamlit/finance/ingest
 
           # Load env vars based on environment designated in PRW_ENV
           set -a; source .env.${PRW_ENV}

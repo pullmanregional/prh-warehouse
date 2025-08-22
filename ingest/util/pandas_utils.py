@@ -44,7 +44,7 @@ def df_find_by_column(
     for col_idx in range(start_col - 1, df.shape[1]):
         column = df.iloc[start_row - 1 :, col_idx]
         for row_idx, cell_value in enumerate(column):
-            if str(cell_value) == text:
+            if str(cell_value).lower() == text.lower():
                 # Return (row, column). start_row is 1-based
                 return row_idx + start_row - 1, col_idx
 

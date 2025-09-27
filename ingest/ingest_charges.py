@@ -366,9 +366,13 @@ def main():
                 [mrn_to_prw_id_df, new_ids_df[["prw_id", "mrn"]]], ignore_index=True
             )
 
-    # Write new PRW IDs to separate ID DB
+    # We should not be generating new PRW IDs since they are being read created
+    # from the source data directly in ingest_patients.py. Output warning instead
+    # of doing update_id_tables().
     if prw_id_engine and not all_new_ids_df.empty:
-        update_id_tables(prw_id_engine, all_new_ids_df)
+        logging.warning(
+            f"WARNING: Missing PRW IDs were created", all_new_ids_df.to_string()
+        )
 
     # Update last ingest time and modified times for source data files
     modified = {

@@ -372,27 +372,32 @@ def read_income_stmt_data(files):
             "budget_ytd",
         ]
 
-        # Add a new column "dept_wd_id" converting the Cost Center to an ID. Drop rows without a known workday dept ID
-        # Reassign canonical dept names from workday ID into the dept_name column
+        # Add a new column "dept_wd_id" converting the Cost Center to an ID.
+        # For unknown cost centers, assign the cost center name as the wd id.
+        # Reassign canonical dept names from workday ID into the dept_name column, or use the wd id if unknown.
         income_stmt_df["dept_wd_id"] = (
             income_stmt_df["Cost Center"]
             .str.lower()
             .map({k.lower(): v for k, v in static_data.ALIASES_TO_WDID.items()})
         )
-        unrecognized = (
-            income_stmt_df[income_stmt_df["dept_wd_id"].isna()]
-            .loc[:, "Cost Center"]
-            .unique()
-        )
-        income_stmt_df.dropna(subset=["dept_wd_id"], inplace=True)
+        unrecognized_mask = income_stmt_df["dept_wd_id"].isna()
+        unrecognized = income_stmt_df.loc[unrecognized_mask, "Cost Center"].unique()
+        # Assign the cost center name as the wd id for unrecognized cost centers
+        income_stmt_df.loc[unrecognized_mask, "dept_wd_id"] = income_stmt_df.loc[
+            unrecognized_mask, "Cost Center"
+        ]
         income_stmt_df["dept_name"] = income_stmt_df["dept_wd_id"].map(
             static_data.WDID_TO_DEPT_NAME
         )
+        # For any still-unmapped dept_name, use the wd id as the name
+        income_stmt_df.loc[income_stmt_df["dept_name"].isna(), "dept_name"] = (
+            income_stmt_df.loc[income_stmt_df["dept_name"].isna(), "dept_wd_id"]
+        )
 
-        # Log unrecognized cost centers that were dropped from data:
+        # Log unrecognized cost centers that were assigned their own name as wd id:
         if len(unrecognized) > 0 and unrecognized[0] != "(Blank)":
             logging.warn(
-                f"Dropping unknown cost centers from income statement: {unrecognized} in {file}"
+                f"Unknown cost centers found in income statement (assigned as their own wd id): {unrecognized} in {file}"
             )
 
         # Add the month as a column

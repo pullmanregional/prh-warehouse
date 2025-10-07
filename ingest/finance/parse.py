@@ -660,3 +660,17 @@ def _find_start_date_of_first_pay_period_in_year(year):
         if pay_date.year == year:
             return cur_date
         cur_date += timedelta(days=14)
+
+
+def read_aged_ar_data(filename):
+    """
+    Read aged accounts receivable totals from a CSV file
+    """
+    logging.info(f"Reading {filename}")
+    df = pd.read_csv(
+        filename,
+        header=0,
+        names=["date", "aged_days", "total", "num_accts"],
+        dtype={"date": str, "aged_days": str, "total": float, "num_accts": int},
+    )
+    return df

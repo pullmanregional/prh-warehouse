@@ -4,7 +4,12 @@ from util import util
 
 
 def check_data_dir(
-    base_path, volumes_file, misc_volumes_file, income_stmt_path, hours_path
+    base_path,
+    volumes_file,
+    misc_volumes_file,
+    income_stmt_path,
+    hours_path,
+    aged_ar_file,
 ):
     """
     Sanity checks for data directory
@@ -23,6 +28,9 @@ def check_data_dir(
         error = f"ERROR: income statements root directory is empty: {income_stmt_path}"
     if not os.path.isdir(hours_path) or len(util.find_data_files(hours_path)) == 0:
         error = f"ERROR: productivity data root directory is empty: {hours_path}"
+
+    if not os.path.isfile(aged_ar_file):
+        error = f"ERROR: aged AR data file is missing: {aged_ar_file}"
 
     if error is not None:
         print(error)

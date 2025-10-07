@@ -56,6 +56,8 @@ def get_file_paths(base_path, epic_in):
     - Current format files organized by year
     - Income statement path
     - Hours path and historical hours file
+    - Accounts Receivable totals by age
+    - Miscellaneous volumes that are pulled by exporter/misc-volumes.sql - needed for the KPI dashboard until the actual source data is ingested into warehouse
     """
     # Historical volume data file
     historical_volumes_file = os.path.join(
@@ -81,6 +83,9 @@ def get_file_paths(base_path, epic_in):
     )
     hours_path = os.path.join(base_path, "PayPeriod")
 
+    # Accounts receivable data. Aged AR contains totals in AR by age bucket (eg 1-30 days, 31-60 days, etc)
+    aged_ar_file = os.path.join(epic_in, "aged-ar.csv")
+
     return (
         historical_volumes_file,
         volumes_path,
@@ -88,6 +93,7 @@ def get_file_paths(base_path, epic_in):
         income_stmt_path,
         hours_path,
         historical_hours_file,
+        aged_ar_file,
     )
 
 
@@ -168,6 +174,7 @@ def main():
         income_stmt_path,
         hours_path,
         historical_hours_file,
+        aged_ar_file,
     ) = get_file_paths(base_path, epic_in)
 
     # Sanity check data directory expected location and files
@@ -177,6 +184,7 @@ def main():
         misc_volumes_file,
         income_stmt_path,
         hours_path,
+        aged_ar_file,
     ):
         logging.error("ERROR: data directory error (see above). Terminating.")
         exit(1)
@@ -192,6 +200,7 @@ def main():
         + [historical_hours_file]
         + income_stmt_files
         + hours_files
+        + [aged_ar_file]
     )
     source_files_str = "\n  ".join(source_files)
     logging.info(f"Discovered source files:\n  {source_files_str}")
@@ -271,6 +280,9 @@ def main():
     hours_by_pay_period_df = parse.read_hours_and_fte_data(hours_files)
     hours_by_pay_period_df = pd.concat([historical_hours_df, hours_by_pay_period_df])
 
+    # Read accounts receivable data
+    aged_ar_df = parse.read_aged_ar_data(aged_ar_file)
+
     # Transform hours data to months
     hours_by_month_df = transform.transform_hours_from_pay_periods_to_months(
         hours_by_pay_period_df
@@ -307,6 +319,7 @@ def main():
                 table=PrwContractedHoursMeta, df=contracted_hours_updated_month_df
             ),
             TableData(table=PrwIncomeStmt, df=income_stmt_df),
+            TableData(table=PrwAgedAR, df=aged_ar_df),
         ],
     )
 

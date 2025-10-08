@@ -784,4 +784,8 @@ def read_aged_ar_data(filename):
         names=["date", "aged_days", "total", "num_accts"],
         dtype={"date": str, "aged_days": str, "total": float, "num_accts": int},
     )
+
+    # Keep date portion only (10 chars) of "date" column
+    df["date"] = df["date"].str[:10]
+
     return df

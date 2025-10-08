@@ -8,6 +8,7 @@ def check_data_dir(
     volumes_file,
     misc_volumes_file,
     income_stmt_path,
+    balance_path,
     hours_path,
     aged_ar_file,
 ):
@@ -25,6 +26,8 @@ def check_data_dir(
         not os.path.isdir(income_stmt_path)
         or len(util.find_data_files(income_stmt_path)) == 0
     ):
+        error = f"ERROR: balance sheets root directory is empty: {balance_path}"
+    if not os.path.isdir(balance_path) or len(util.find_data_files(balance_path)) == 0:
         error = f"ERROR: income statements root directory is empty: {income_stmt_path}"
     if not os.path.isdir(hours_path) or len(util.find_data_files(hours_path)) == 0:
         error = f"ERROR: productivity data root directory is empty: {hours_path}"

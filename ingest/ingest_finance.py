@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+import warnings
 import pandas as pd
 from datetime import datetime
 from sqlmodel import Session
@@ -28,6 +29,9 @@ pd.set_option("future.no_silent_downcasting", True)
 # Logging definitions
 logging.basicConfig(level=logging.INFO)
 SHOW_SQL_IN_LOG = False
+
+# Suppress openpyxl warnings about missing default styles
+warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 # Specific worksheet names containing data to ingest in the Dashboard Supporting Data spreadsheet
 VOLUMES_BUDGET_SHEET = "Data"
@@ -74,6 +78,10 @@ def get_file_paths(base_path, epic_in):
     # ./Natural Class/2022/(01) Jan 2022 Natural Class.xlsx
     income_stmt_path = os.path.join(base_path, "Natural Class")
 
+    # The Balance subdir contains balance statements in one Excel file per month, eg,
+    # ./Balance/2022/(01) Jan 2022 Balance Sheet.xlsx
+    balance_path = os.path.join(base_path, "Balance")
+
     # PayPeriod subdir contains productive / non-productive hours and FTE data per month. eg,
     #   ./PayPeriod/2023/PP#1 2023 Payroll_Productivity_by_Cost_Center.xlsx
     # In addition, historical data for 2022 PP#1-25, which includes the clinic network, is lumped together a separate file:
@@ -91,6 +99,7 @@ def get_file_paths(base_path, epic_in):
         volumes_path,
         misc_volumes_file,
         income_stmt_path,
+        balance_path,
         hours_path,
         historical_hours_file,
         aged_ar_file,
@@ -172,6 +181,7 @@ def main():
         volumes_path,
         misc_volumes_file,
         income_stmt_path,
+        balance_path,
         hours_path,
         historical_hours_file,
         aged_ar_file,
@@ -183,6 +193,7 @@ def main():
         historical_volumes_file,
         misc_volumes_file,
         income_stmt_path,
+        balance_path,
         hours_path,
         aged_ar_file,
     ):
@@ -192,6 +203,7 @@ def main():
     # Get list of dynamic data files, ie data organized as one Excel workbook per month
     volumes_files = find_volumes_files(volumes_path, HISTORICAL_VOLUMES_YEAR + 1)
     income_stmt_files = util.find_data_files(income_stmt_path)
+    balance_files = util.find_data_files(balance_path)
     hours_files = util.find_data_files(hours_path, exclude=[historical_hours_file])
     source_files = (
         [historical_volumes_file]
@@ -199,6 +211,7 @@ def main():
         + [misc_volumes_file]
         + [historical_hours_file]
         + income_stmt_files
+        + balance_files
         + hours_files
         + [aged_ar_file]
     )
@@ -280,6 +293,9 @@ def main():
     hours_by_pay_period_df = parse.read_hours_and_fte_data(hours_files)
     hours_by_pay_period_df = pd.concat([historical_hours_df, hours_by_pay_period_df])
 
+    # # Read balance sheets
+    balance_df = parse.read_balance_sheets(balance_files)
+
     # Read accounts receivable data
     aged_ar_df = parse.read_aged_ar_data(aged_ar_file)
 
@@ -320,6 +336,7 @@ def main():
             ),
             TableData(table=PrwIncomeStmt, df=income_stmt_df),
             TableData(table=PrwAgedAR, df=aged_ar_df),
+            TableData(table=PrwBalanceSheet, df=balance_df),
         ],
     )
 

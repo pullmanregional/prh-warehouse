@@ -1,9 +1,11 @@
+import os
 import re
 import logging
 import pandas as pd
 from datetime import datetime, timedelta
 from util import pandas_utils
 from finance import static_data
+from openpyxl import load_workbook
 
 # Starting point for converting bi-weekly pay period number to start and end dates. Set to the start date of pay period 1 for the given year.
 # Pay periods go from Saturday -> Friday two weeks later, and the pay date is on the Friday following the pay period.
@@ -660,6 +662,115 @@ def _find_start_date_of_first_pay_period_in_year(year):
         if pay_date.year == year:
             return cur_date
         cur_date += timedelta(days=14)
+
+
+def read_balance_sheets(files):
+    """
+    Read and combine data from Excel workbooks for balance sheets, which are per month.
+    Each workbook contains hierarchical financial data with indentation levels representing tree structure.
+    """
+    # There is a (MM) MMM YYYY Balance Sheet.xlsx file (eg (01) Jan 2022 Balance Sheet.xlsx) for each month
+    ret = []
+    for file in files:
+        logging.info(f"Reading {file}")
+
+        # Use openpyxl to read the workbook for proper indentation detection
+        workbook = load_workbook(file)
+        worksheet = workbook.active
+
+        # Get the month from the filename after validating that it matches the period in cell B3
+        month = _get_month_from_sheet(file, worksheet)
+
+        # Process the balance sheet data
+        balance_sheet_df = _process_balance_sheet_data(worksheet, month)
+        ret.append(balance_sheet_df)
+
+    # Join all the tables
+    df = pd.concat(ret)
+    return df
+
+
+def _get_month_from_sheet(file_path, worksheet):
+    """
+    Validate that the filename month/date matches the period in the "Period" cell, B3 (format: YYYY - MMM).
+    Returns the month in YYYY-MM format.
+    """
+    # Month and year from filename, formatted as: (MM) MMM YYYY Balance Sheet.xlsx
+    filename = os.path.basename(file_path)
+    file_match = re.search(r"^\((\d+)\)\s*(\w+)\s*(\d{4})\s", filename)
+    if not file_match:
+        raise ValueError(f"Invalid Balance Sheet file name format: {file_path}")
+    file_month = file_match.group(2).strip().lower()
+    file_year = int(file_match.group(3))
+
+    # Get period from cell B3. Format: YYYY - MMM
+    xls_period = worksheet.cell(row=3, column=2).value
+    xls_match = re.search(r"^(\d{4})\s*-\s*(\w+)", str(xls_period))
+    if not xls_match:
+        raise ValueError(f"Invalid Period in Balance Sheet: {file_path} / {xls_period}")
+    xls_year = int(xls_match.group(1))
+    xls_month = xls_match.group(2).strip().lower()
+
+    # Validate year/month matches
+    if file_year != xls_year or file_month != xls_month:
+        raise ValueError(
+            f"Filename/Period mismatch: filename={file_path}, Period={xls_period}"
+        )
+
+    # Convert year + three letter month to YYYY-MM
+    dt = datetime.strptime(f"{file_year}-{file_month}", "%Y-%b")
+    return dt.strftime("%Y-%m")
+
+
+def _process_balance_sheet_data(worksheet, month):
+    """
+    Process balance sheet data starting, building hierarchical tree structure.
+    Uses openpyxl to detect indentation formatting.
+    """
+    data = []
+    tree_stack = []  # Stack to track current hierarchy path
+    line_num = 1
+
+    # Start from row 8 and process each row
+    for row in range(8, worksheet.max_row + 1):
+        # Get cell values from column A (ledger account) and column B (actual value)
+        ledger_acct_cell = worksheet.cell(row=row, column=1)
+        actual_value_cell = worksheet.cell(row=row, column=2)
+        ledger_acct = ledger_acct_cell.value
+        actual_value = actual_value_cell.value
+
+        # Skip if ledger account is empty, None, or starts with "Check -"
+        if (
+            ledger_acct is None
+            or str(ledger_acct).strip() == ""
+            or str(ledger_acct).strip().startswith("Check -")
+        ):
+            continue
+        else:
+            ledger_acct = str(ledger_acct).strip()
+
+        # Get the current indentation level from the cell's alignment
+        alignment = ledger_acct_cell.alignment
+        indent_level = int(alignment.indent) if alignment else 0
+
+        # If we're at a shallower level, truncate stack to match. Otherwise, just add to stack.
+        if indent_level < len(tree_stack):
+            tree_stack = tree_stack[:indent_level]
+        tree_stack.append(ledger_acct)
+
+        # Save current row
+        data.append(
+            {
+                "month": month,
+                "tree": "|".join(tree_stack),
+                "line_num": line_num,
+                "ledger_acct": ledger_acct,
+                "actual": actual_value,
+            }
+        )
+        line_num += 1
+
+    return pd.DataFrame(data)
 
 
 def read_aged_ar_data(filename):

@@ -735,9 +735,10 @@ def _process_balance_sheet_data(worksheet, month):
     for row in range(8, worksheet.max_row + 1):
         # Get cell values from column A (ledger account) and column B (actual value)
         ledger_acct_cell = worksheet.cell(row=row, column=1)
-        actual_value_cell = worksheet.cell(row=row, column=2)
         ledger_acct = ledger_acct_cell.value
-        actual_value = actual_value_cell.value
+        actual = worksheet.cell(row=row, column=2).value
+        actual_prev_month = worksheet.cell(row=row, column=3).value
+        actual_prev_year = worksheet.cell(row=row, column=5).value
 
         # Skip if ledger account is empty, None, or starts with "Check -"
         if (
@@ -765,7 +766,9 @@ def _process_balance_sheet_data(worksheet, month):
                 "tree": "|".join(tree_stack),
                 "line_num": line_num,
                 "ledger_acct": ledger_acct,
-                "actual": actual_value,
+                "actual": actual,
+                "actual_prev_month": actual_prev_month,
+                "actual_prev_year": actual_prev_year,
             }
         )
         line_num += 1

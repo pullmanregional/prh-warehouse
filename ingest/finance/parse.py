@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from util import pandas_utils
 from finance import static_data
 from openpyxl import load_workbook
+from openpyxl.styles import Alignment
 
 # Starting point for converting bi-weekly pay period number to start and end dates. Set to the start date of pay period 1 for the given year.
 # Pay periods go from Saturday -> Friday two weeks later, and the pay date is on the Friday following the pay period.
@@ -730,6 +731,22 @@ def _process_balance_sheet_data(worksheet, month):
     data = []
     tree_stack = []  # Stack to track current hierarchy path
     line_num = 1
+
+    # Custom business logic for missing header, current as of 10/2025:
+    #   Add a header line after "Net Patient Accounts Receivable" for "Other Receivables"
+    for row in range(8, worksheet.max_row + 1):
+        cell = worksheet.cell(row=row, column=1)
+        next_cell_alignment = worksheet.cell(row=row + 1, column=1).alignment
+        if (
+            cell.value == "Net Patient Accounts Receivable"
+            and next_cell_alignment
+            and int(next_cell_alignment.indent) > 0
+        ):
+            worksheet.insert_rows(row + 1)
+            new_cell = worksheet.cell(row=row + 1, column=1)
+            new_cell.value = "Other Receivables"
+            new_cell.alignment = Alignment(indent=1)
+            break
 
     # Start from row 8 and process each row
     for row in range(8, worksheet.max_row + 1):

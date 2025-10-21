@@ -65,11 +65,11 @@ def get_file_paths(base_path, epic_in):
     """
     # Historical volume data file
     historical_volumes_file = os.path.join(
-        base_path, "Dashboard Supporting Data 2024 v3.xlsx"
+        base_path, "Supporting Data", "Dashboard Supporting Data 2024 v3.xlsx"
     )
 
-    # The DOMO directory contains the latest Dashboard Supporting Data spreadsheet files
-    volumes_path = os.path.join(base_path, "DOMO")
+    # The "Supporting Data/YYYY/" directories contains the latest Dashboard Supporting Data spreadsheet files
+    volumes_path = os.path.join(base_path, "Supporting Data")
 
     # Miscellaneous volumes file (temp summary data from Epic) is in Sources/epic dir
     misc_volumes_file = os.path.join(epic_in, "misc-volumes.csv")

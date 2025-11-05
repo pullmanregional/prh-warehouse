@@ -35,6 +35,7 @@ jobs:
           uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --output "$PAYROLL_PRODUCTIVITY_MASTER_XLS_FILE" --clear-output
           uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --input-dir "$PP_INPUT_DIR" --output "$PP_MASTER_XLS_FILE"
         env:
+          PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PP_YEAR: ${{ inputs.year }}
           PP_NUM: ${{ inputs.payperiod }}
           PP_INPUT_DIR: ${{ env.PRH_REPORTS_PP_FILES }}

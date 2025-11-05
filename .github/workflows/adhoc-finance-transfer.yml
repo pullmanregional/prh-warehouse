@@ -32,11 +32,10 @@ jobs:
           set -a; source .env.$PRW_ENV
 
           # Run script
-          uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --output "$PAYROLL_PRODUCTIVITY_MASTER_XLS_FILE" --clear-output
-          uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --input-dir "$PP_INPUT_DIR" --output "$PP_MASTER_XLS_FILE"
+          uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --output "$PP_MASTER_XLS_FILE" --clear-output
+          uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --input-dir "$PRH_REPORTS_PP_FILES" --output "$PP_MASTER_XLS_FILE"
         env:
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PP_YEAR: ${{ inputs.year }}
           PP_NUM: ${{ inputs.payperiod }}
-          PP_INPUT_DIR: ${{ env.PRH_REPORTS_PP_FILES }}
-          PP_MASTER_XLS_FILE: ${{ env.PAYROLL_PRODUCTIVITY_MASTER_FILE }}
+          PP_MASTER_XLS_FILE: ${{ vars.PAYROLL_PRODUCTIVITY_MASTER_FILE }}

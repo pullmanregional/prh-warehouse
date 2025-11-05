@@ -1,4 +1,4 @@
-name: Reports Adhoc - data transfer between Finance spreadsheet models
+name: Reports Adhoc - Finance Spreadsheet Transfer
 
 on:
   workflow_dispatch:

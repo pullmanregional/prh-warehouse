@@ -1,0 +1,41 @@
+name: Reports Adhoc - data transfer between Finance spreadsheet models
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Year to update in format YYYY (eg 2025)"
+        required: false
+        type: string
+      payperiod:
+        description: "Pay period number between 1-26"
+        required: true
+        type: string
+
+jobs:
+  run-reports:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout prw-exporter
+        uses: actions/checkout@v4
+        with:
+          repository: pullmanregional/prw-exporter
+          token: ${{ secrets.DEPLOY_PAT }}
+          path: prw-exporter
+          submodules: true
+
+      - name: Run script
+        run: |
+          pushd prw-exporter/reports
+
+          # Load env vars based on environment designated in PRW_ENV
+          set -a; source .env.$PRW_ENV
+
+          # Run script
+          uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --output "$PAYROLL_PRODUCTIVITY_MASTER_XLS_FILE" --clear-output
+          uv run python finance_payroll_accrual.py --year "$PP_YEAR" --pp "$PP_NUM" --input-dir "$PP_INPUT_DIR" --output "$PP_MASTER_XLS_FILE"
+        env:
+          PP_YEAR: ${{ inputs.year }}
+          PP_NUM: ${{ inputs.payperiod }}
+          PP_INPUT_DIR: ${{ env.PRH_REPORTS_PP_FILES }}
+          PP_MASTER_XLS_FILE: ${{ env.PAYROLL_PRODUCTIVITY_MASTER_FILE }}

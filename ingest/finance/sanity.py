@@ -1,4 +1,5 @@
 import os
+import re
 import pandas as pd
 from util import util
 
@@ -29,8 +30,16 @@ def check_data_dir(
         error = f"ERROR: balance sheets root directory is empty: {balance_path}"
     if not os.path.isdir(balance_path) or len(util.find_data_files(balance_path)) == 0:
         error = f"ERROR: income statements root directory is empty: {income_stmt_path}"
-    if not os.path.isdir(hours_path) or len(util.find_data_files(hours_path)) == 0:
+
+    hours_files = util.find_data_files(hours_path)
+    if not os.path.isdir(hours_path) or len(hours_files) == 0:
         error = f"ERROR: productivity data root directory is empty: {hours_path}"
+    else:
+        # Make sure every data file is named by convention "PP#<NN> <YYYY>..."
+        for file in hours_files:
+            if not re.match(r"^PP#\d\d? \d{4}.*", file):
+                error = f"ERROR: invalid productivity data filename: {file}"
+                break
 
     if not os.path.isfile(aged_ar_file):
         error = f"ERROR: aged AR data file is missing: {aged_ar_file}"

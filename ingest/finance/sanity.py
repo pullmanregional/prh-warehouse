@@ -34,14 +34,6 @@ def check_data_dir(
     hours_files = util.find_data_files(hours_path)
     if not os.path.isdir(hours_path) or len(hours_files) == 0:
         error = f"ERROR: productivity data root directory is empty: {hours_path}"
-    else:
-        # Make sure every data file is named by convention "PP#<NN> <YYYY>..."
-        # Except for the historical hours file
-        historical_hours_re = r"^PP#\d\d?-PP#\d\d?.*"
-        for file in hours_files:
-            if not re.match(r"^PP#\d\d? \d{4}.*", file) and not re.match(historical_hours_re, file):
-                error = f"ERROR: invalid productivity data filename: {file}"
-                break
 
     if not os.path.isfile(aged_ar_file):
         error = f"ERROR: aged AR data file is missing: {aged_ar_file}"

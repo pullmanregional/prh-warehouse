@@ -1,30 +1,30 @@
 name: "* Main - Full Ingest Pipeline"
 
 on:
-  # Run daily at 13:00 UTC which is 05:00 PST or 06:00 PDT
+  # Run daily at 14:00 UTC which is 06:00 PST or 07:00 PDT
   # PST is UTC-8 (Nov to Mar) and PDT is UTC-7 (Mar to Nov)
   # No timezone support for GH Actions yet. See https://github.com/orgs/community/discussions/13454
   schedule:
-    - cron: '0 13 * * *'
+    - cron: "0 14 * * *"
   workflow_dispatch:
     inputs:
       run_sources_epic:
-        description: 'Extract Epic data (sources-epic.yml)'
+        description: "Extract Epic data (sources-epic.yml)"
         required: false
         default: true
         type: boolean
       run_ingest_sources:
-        description: 'Ingest source data (ingest/main.py)'
+        description: "Ingest source data (ingest/main.py)"
         required: false
         default: true
         type: boolean
       run_ingest_datamarts:
-        description: 'Trigger datamart ingest (datamart-*.yml)'
+        description: "Trigger datamart ingest (datamart-*.yml)"
         required: false
         default: true
         type: boolean
       run_reports:
-        description: 'Run reports (reports.yml)'
+        description: "Run reports (reports.yml)"
         required: false
         default: true
         type: boolean
@@ -61,7 +61,7 @@ jobs:
         run: |
           pushd pipeline
           npm install && node poll_workflows.js sources-epic
-  
+
   run-ingest-sources:
     runs-on: self-hosted
     needs: await-sources-epic

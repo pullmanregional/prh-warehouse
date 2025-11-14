@@ -22,7 +22,7 @@ jobs:
 
       - name: Run script
         run: |
-          pushd prw-exporter/reports
+          pushd prw-exporter/reports/finance
 
           # Load env vars based on environment designated in PRW_ENV
           set -a; source .env.$PRW_ENV
@@ -32,4 +32,4 @@ jobs:
         env:
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PRW_CONN: ${{ secrets.PRW_CONN_RO }}
-          PRH_REPORTS_DOMO_PATH: ${{ secrets.PRH_REPORTS_DOMO_PATH }}
+          PRH_REPORTS_DOMO_PATH: ${{ vars.PRH_REPORTS_DOMO_PATH }}

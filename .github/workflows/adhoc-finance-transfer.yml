@@ -26,7 +26,7 @@ jobs:
 
       - name: Run script
         run: |
-          pushd prw-exporter/reports
+          pushd prw-exporter/reports/finance
 
           # Load env vars based on environment designated in PRW_ENV
           set -a; source .env.$PRW_ENV

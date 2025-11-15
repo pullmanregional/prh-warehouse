@@ -25,7 +25,7 @@ jobs:
           pushd prw-exporter/reports/finance
 
           # Load env vars based on environment designated in PRW_ENV
-          set -a; source .env.$PRW_ENV
+          set -a; source ../.env.$PRW_ENV
 
           # Run script
           uv run python finance_domo.py --prw "$PRW_CONN" --out "$PRH_REPORTS_DOMO_PATH" --month "${{ inputs.month }}"

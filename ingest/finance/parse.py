@@ -251,90 +251,87 @@ def read_budget_data(filename, budget_sheet):
     return _process_budget_table(budget_df)
 
 
-def read_historical_contracted_hours_data(year, filename, sheet):
+def read_contracted_hours_data(filename):
     """
-    Read historical contracted hours data from the Dashboard Supporting Data Excel workbook
+    Read contracted hours data which is tracked by Finance in its own workbook
     """
-    # Extract table
-    logging.info(f"Reading historical data from {filename}, {sheet}")
-    xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
-    xl_df = pandas_utils.df_get_table(xl_data, start_cell="A4", has_header_row=True)
+    # Find the data sheets, which are named: YYYY DATA
+    sheet_re = re.compile(r"^\d{4} DATA$")
+    workbook = load_workbook(filename, read_only=True, data_only=True)
+    sheets = [s for s in workbook.sheetnames if sheet_re.match(s)]
+    workbook.close()
 
-    # Get the last updated month from the top of the sheet
-    contracted_hours_updated_month = pandas_utils.df_get_val_or_range(xl_data, "G1")
+    # Extract tables from each sheet and combine
+    dfs = []
+    for sheet in sheets:
+        logging.info(f"Reading {filename}, {sheet}")
+        xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
+        df = pandas_utils.df_get_table(xl_data, start_cell="A2", has_header_row=True)
 
-    # Rename columns, which appear in groups of 3 for each year:
-    #   YYYY PRH ProdHrs YE, YYYY Travelers YE, YYYY TOTAL
-    # to:
-    #   YYYY_prh, YYYY, YYYY_ttl
-    col_names = ["dept_wd_id", "dept_name"]
-    years = []
-    for i in range(2, xl_df.shape[1], 3):
-        year = xl_df.columns[i].split(" ")[0]
-        years.append(year)
-        col_names.append(f"{year}_prh")
-        col_names.append(f"{year}_hrs")
-        col_names.append(f"{year}_ttl")
-    xl_df.columns = col_names
+        # Store the effective month in "YYYY-MM" format. Attribute hours to "Date End" month
+        # for now, because there is nothing in the spreadsheet that breaks down the exact
+        # month the hours were worked. If Date End is not a valid date (na, ?, -, etc), use
+        # the Invoice Date.
+        date_to_month = lambda col: pd.to_datetime(
+            col, format="%m/%d/%Y", errors="coerce"
+        ).dt.strftime("%Y-%m")
+        df["month"] = date_to_month(df["Date End"])
+        invalid_month_mask = df["month"].isna()
+        df.loc[invalid_month_mask, "month"] = date_to_month(
+            df.loc[invalid_month_mask, "Invoice Date"]
+        )
 
-    # Transform
-    # ---------
-    # Unpivot Excel data from columns:
-    #   ID, dept_name, YYYY_hrs, YYYY_ttl, YYYY_pct
-    # to:
-    #   ID, dept_name, year, hours, pct
-    df = pd.DataFrame(
-        columns=["dept_wd_id", "dept_name", "year", "hrs", "ttl_dept_hrs"]
-    )
-    for idx, row in xl_df.iterrows():
-        for year in years:
-            df.loc[len(df)] = {
-                "dept_wd_id": row["dept_wd_id"],
-                "dept_name": row["dept_name"],
-                "year": year,
-                "hrs": row[f"{year}_hrs"],
-                "ttl_dept_hrs": row[f"{year}_ttl"],
+        # Convert Workday Cost Center to ID, then normalize the cost center name
+        df["dept_wd_id"] = (
+            df["Cost Center"]
+            .str.lower()
+            .map({k.lower(): v for k, v in static_data.ALIASES_TO_WDID.items()})
+        )
+        df["Cost Center"] = df["dept_wd_id"].map(static_data.WDID_TO_DEPT_NAME)
+
+        # Drop rows with no name or with 0 or NA hours
+        df = df.dropna(subset=["Traveler Name", "Total Hours"])
+        df = df[df["Total Hours"] != 0]
+
+        # Validate month and cost center IDs correctly assigned
+        if df["month"].isna().any() or df["dept_wd_id"].isna().any():
+            raise ValueError(
+                f"Invalid contracted hours month or cost center: {df['Cost Center'][df['dept_wd_id'].isna() | df['month'].isna()]}"
+            )
+
+        # Retain and rename needed columns
+        df = df.rename(
+            columns={
+                "Traveler Name": "name",
+                "License Type": "type",
+                "Cost Center": "dept_name",
+                "Regular": "reg_hrs",
+                "Overtime": "overtime_hrs",
+                "On-Call": "call_hrs",
+                "Holiday": "holiday_hrs",
+                "Call Back": "callback_hrs",
+                "Other ": "other_hrs",
+                "Total Hours": "total_hrs",
             }
+        )[
+            [
+                "name",
+                "type",
+                "dept_name",
+                "dept_wd_id",
+                "month",
+                "reg_hrs",
+                "overtime_hrs",
+                "call_hrs",
+                "holiday_hrs",
+                "callback_hrs",
+                "other_hrs",
+                "total_hrs",
+            ]
+        ]
+        dfs.append(df)
 
-    # Interpret NaN as 0 for total hours
-    df["hrs"] = df["hrs"].fillna(0)
-    df["ttl_dept_hrs"] = df["ttl_dept_hrs"].fillna(0)
-
-    return contracted_hours_updated_month, df
-
-
-def read_contracted_hours_data(year, filename, sheet):
-    """
-    Read sheet from the Dashboard Supporting Data Excel workbook with Traveler's Hours
-    """
-    # Extract table
-    logging.info(f"Reading {filename}, {sheet}")
-    xl_data = pd.read_excel(filename, sheet_name=sheet, header=None)
-    df = pandas_utils.df_get_table(xl_data, start_cell="A4", has_header_row=True)
-
-    df.columns = [
-        "as_of_date",
-        "dept_wd_id",
-        "dept_name",
-        "Prior Year PRH ProdHrs YE",
-        "Prior Year Travelers YE",
-        "Prior Year TOTAL",
-        "Current Year PRH ProdHrs YTD",
-        "hrs",
-        "ttl_dept_hrs",
-    ]
-
-    # Locate the last updated month in the first row of the as-of-date column
-    contracted_hours_updated_month = df["as_of_date"].iloc[0]
-
-    # Add year column
-    df["year"] = pd.to_datetime(df["as_of_date"]).dt.year
-
-    # Interpret NaN as 0 for hours
-    df["hrs"] = df["hrs"].fillna(0)
-    df["ttl_dept_hrs"] = df["ttl_dept_hrs"].fillna(0)
-
-    return contracted_hours_updated_month, df
+    return pd.concat(dfs)
 
 
 def read_income_stmt_data(files):

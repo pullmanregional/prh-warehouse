@@ -11,6 +11,7 @@ def check_data_dir(
     income_stmt_path,
     balance_path,
     hours_path,
+    contracted_hours_file,
     aged_ar_file,
 ):
     """
@@ -34,6 +35,9 @@ def check_data_dir(
     hours_files = util.find_data_files(hours_path)
     if not os.path.isdir(hours_path) or len(hours_files) == 0:
         error = f"ERROR: productivity data root directory is empty: {hours_path}"
+
+    if not os.path.isfile(contracted_hours_file):
+        error = f"ERROR: contracted hours data file is missing: {contracted_hours_file}"
 
     if not os.path.isfile(aged_ar_file):
         error = f"ERROR: aged AR data file is missing: {aged_ar_file}"

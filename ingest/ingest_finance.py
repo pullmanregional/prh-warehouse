@@ -27,7 +27,8 @@ INGEST_DATASET_ID = "finance"
 pd.set_option("future.no_silent_downcasting", True)
 
 # Logging definitions
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 SHOW_SQL_IN_LOG = False
 
 # Suppress openpyxl warnings about missing default styles
@@ -90,6 +91,9 @@ def get_file_paths(base_path, epic_in):
         base_path, "PayPeriod", "2022", "PP#1-PP#26 Payroll Productivity.xlsx"
     )
     hours_path = os.path.join(base_path, "PayPeriod")
+    contracted_hours_file = os.path.join(
+        base_path, "2024 -2025 Contract Employees.xlsx"
+    )
 
     # Accounts receivable data. Aged AR contains totals in AR by age bucket (eg 1-30 days, 31-60 days, etc)
     aged_ar_file = os.path.join(epic_in, "aged-ar.csv")
@@ -101,6 +105,7 @@ def get_file_paths(base_path, epic_in):
         income_stmt_path,
         balance_path,
         hours_path,
+        contracted_hours_file,
         historical_hours_file,
         aged_ar_file,
     )
@@ -172,8 +177,8 @@ def main():
     epic_in = args.epic_in
     output_conn = args.prw
     drop_tables = args.drop
-    logging.info(f"Data dir: {base_path}, output: {mask_conn_pw(output_conn)}")
-    logging.info(f"Drop tables before writing: {drop_tables}")
+    logger.info(f"Data dir: {base_path}, output: {mask_conn_pw(output_conn)}")
+    logger.info(f"Drop tables before writing: {drop_tables}")
 
     # Source file paths
     (
@@ -183,6 +188,7 @@ def main():
         income_stmt_path,
         balance_path,
         hours_path,
+        contracted_hours_file,
         historical_hours_file,
         aged_ar_file,
     ) = get_file_paths(base_path, epic_in)
@@ -195,9 +201,10 @@ def main():
         income_stmt_path,
         balance_path,
         hours_path,
+        contracted_hours_file,
         aged_ar_file,
     ):
-        logging.error("ERROR: data directory error (see above). Terminating.")
+        logger.error("ERROR: data directory error (see above). Terminating.")
         exit(1)
 
     # Get list of dynamic data files, ie data organized as one Excel workbook per month
@@ -216,7 +223,7 @@ def main():
         + [aged_ar_file]
     )
     source_files_str = "\n  ".join(source_files)
-    logging.info(f"Discovered source files:\n  {source_files_str}")
+    logger.info(f"Discovered source files:\n  {source_files_str}")
 
     # TODO: data verification
     # - volumes_file, List worksheet: verify same data as static_data.WDID_TO_DEPTNAME
@@ -224,7 +231,7 @@ def main():
     # - hours and income data is present for the latest month we have volume data for
     # - fte, volumes should all be non-negative. Hours can be negative for adjustments
     if not sanity.check_data_files(historical_volumes_file, income_stmt_files):
-        logging.error("ERROR: data files sanity check failed (see above).")
+        logger.error("ERROR: data files sanity check failed (see above).")
         exit(1)
 
     # Extract and perform basic transformation of data from spreadsheets
@@ -242,17 +249,10 @@ def main():
         HRS_PER_VOLUME_SHEET,
         HISTORICAL_UOS_SHEET,
     )
-    contracted_hours_updated_month, contracted_hours_df = (
-        parse.read_historical_contracted_hours_data(
-            HISTORICAL_VOLUMES_YEAR,
-            historical_volumes_file,
-            CONTRACTED_HRS_SHEET,
-        )
-    )
 
     # Process monthly Dashboard Supporting Data files if exists
     for volumes_file in volumes_files:
-        logging.info(f"Processing supporting data file: {volumes_file}")
+        logger.info(f"Processing supporting data file: {volumes_file}")
 
         # Get year from filename which is in format "(MM) MMM YYYY Dashboard ..."
         year_match = re.search(r"\d{4}", os.path.basename(volumes_file))
@@ -263,27 +263,16 @@ def main():
         )
         current_uos_df = parse.read_volume_and_uos_data(year, volumes_file, UOS_SHEET)
         current_budget_df = parse.read_budget_data(volumes_file, VOLUMES_BUDGET_SHEET)
-        current_contracted_hours_updated_month, current_contracted_hours_df = (
-            parse.read_contracted_hours_data(year, volumes_file, CONTRACTED_HRS_SHEET)
-        )
 
         volumes_df = pd.concat([volumes_df, current_volumes_df])
         uos_df = pd.concat([uos_df, current_uos_df])
         budget_df = pd.concat([budget_df, current_budget_df])
-        contracted_hours_df = pd.concat(
-            [contracted_hours_df, current_contracted_hours_df]
-        )
-        contracted_hours_updated_month = max(
-            contracted_hours_updated_month, current_contracted_hours_updated_month
-        )
-
-    # Store the updated contracted hours month in its own table
-    contracted_hours_updated_month_df = pd.DataFrame(
-        {"contracted_hours_updated_month": [str(contracted_hours_updated_month)]}
-    )
 
     # Get extra volume metrics from Epic data
     misc_volumes_df = parse.read_misc_volumes_data(misc_volumes_file)
+
+    # Read contracted hours data
+    contracted_hours_df = parse.read_contracted_hours_data(contracted_hours_file)
 
     # Read income statement and hours data
     income_stmt_df = parse.read_income_stmt_data(income_stmt_files)
@@ -307,16 +296,16 @@ def main():
     # Get connection to output DBs
     prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
-        logging.error("ERROR: cannot open output DB (see above). Terminating.")
+        logger.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
     prw_session = Session(prw_engine)
 
     # Create tables if they do not exist
     if drop_tables:
-        logging.info("Dropping existing tables")
+        logger.info("Dropping existing tables")
         PrwMetaModel.metadata.drop_all(prw_engine)
         PrwFinanceModel.metadata.drop_all(prw_engine)
-    logging.info("Creating tables")
+    logger.info("Creating tables")
     PrwMetaModel.metadata.create_all(prw_engine)
     PrwFinanceModel.metadata.create_all(prw_engine)
 
@@ -331,9 +320,6 @@ def main():
             TableData(table=PrwHoursByPayPeriod, df=hours_by_pay_period_df),
             TableData(table=PrwHours, df=hours_by_month_df),
             TableData(table=PrwContractedHours, df=contracted_hours_df),
-            TableData(
-                table=PrwContractedHoursMeta, df=contracted_hours_updated_month_df
-            ),
             TableData(table=PrwIncomeStmt, df=income_stmt_df),
             TableData(table=PrwAgedAR, df=aged_ar_df),
             TableData(table=PrwBalanceSheet, df=balance_df),
@@ -351,7 +337,7 @@ def main():
     prw_session.close()
     prw_engine.dispose()
 
-    logging.info("Done")
+    logger.info("Done")
 
 
 if __name__ == "__main__":

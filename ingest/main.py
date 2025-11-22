@@ -16,7 +16,12 @@ import pathlib
 import asyncio
 import argparse
 import time
+import psutil
+import logging
 from prw_common.db_utils import mask_conn_pw
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 # Load config from env vars into constants. The caller needs to preload these by running `source .env.${PRW_ENV}`.
 PRW_EPIC_SOURCE_DIR = os.environ.get("PRW_EPIC_SOURCE_DIR")
@@ -35,11 +40,7 @@ INGEST_CODE_ROOT = pathlib.Path(__file__).parent.parent / "ingest"
 # -----------------------------------------
 async def run_pipeline(run_ingest=True, run_transform=True):
     # Create/update the venv which is used by all scripts in ../ingest/
-    await shell_op(
-        cmd="uv sync",
-        cwd=INGEST_CODE_ROOT,
-        cmd_name="uv_sync"
-    )
+    await shell_op(cmd="uv sync", cwd=INGEST_CODE_ROOT, cmd_name="uv_sync")
 
     if run_ingest:
         # Run ingest subflows
@@ -101,7 +102,9 @@ async def ingest_charges():
 
 
 async def ingest_imaging():
-    cmd = f'uv run python ingest_imaging.py -i "{PRW_EPIC_SOURCE_DIR}" --prw "{PRW_CONN}"'
+    cmd = (
+        f'uv run python ingest_imaging.py -i "{PRW_EPIC_SOURCE_DIR}" --prw "{PRW_CONN}"'
+    )
     return await shell_op(
         cmd=cmd,
         cwd=INGEST_CODE_ROOT,
@@ -134,20 +137,32 @@ async def transform_patient_panel():
 # -----------------------------------------
 async def run_parallel(*coroutines, max_parallel=3):
     """Run async functions in parallel, but limit concurrency to max_parallel"""
-    
+
     # Await each coroutine to complete execution within a critical section to limit concurrency
     sem = asyncio.Semaphore(max_parallel)
+
     async def sem_task(coroutine):
         async with sem:
             # Print the name of the function, then schedule and await completion of function
-            print(f"Starting task: {coroutine.__name__}")
+            logger.info(f"Starting: {coroutine.__name__}")
             start_time = time.time()
             await coroutine
-            print(f"Task complete: {coroutine.__name__} - {time.time() - start_time:.2f}s")
+            logger.info(
+                f"Complete: {coroutine.__name__} - {time.time() - start_time:.2f}s"
+            )
 
-    # The call to fn() returns a coroutine in run_parallel(fn()). The coroutine needs to be
-    # scheduled in order to actually execute. asyncio.gather() schedules the coroutines for execution.
-    return await asyncio.gather(*[sem_task(c) for c in coroutines])
+    # Create and schedule coroutines. FIRST_EXCEPTION returns failures immediately.
+    tasks = [asyncio.create_task(sem_task(c)) for c in coroutines]
+    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+
+    # On failure, cancel remaining tasks and re-raise first exception
+    for task in done:
+        if task.exception():
+            for p in pending:
+                p.cancel()
+            raise task.exception()
+
+    return [task.result() for task in tasks]
 
 
 async def shell_op(cmd, env=None, cwd=None, cmd_name="") -> int:
@@ -156,7 +171,7 @@ async def shell_op(cmd, env=None, cwd=None, cmd_name="") -> int:
     is combined into main process stdout.
     """
     prefix = f"({cmd_name}) " if cmd_name else ""
-    print(f"{prefix}Running command: {mask_conn_pw(cmd)}")
+    logger.info(f"{prefix}Running command: {mask_conn_pw(cmd)}")
 
     # Pass current environment into subprocess, and add env if provided
     subprocess_env = os.environ.copy()
@@ -172,7 +187,7 @@ async def shell_op(cmd, env=None, cwd=None, cmd_name="") -> int:
     # Prefix output with process name
     async def prefix_output(stream):
         while line := await stream.readline():
-            print(f"{prefix}{line.decode().rstrip()}")
+            logger.info(f"{prefix}{line.decode().rstrip()}")
 
     await asyncio.gather(
         prefix_output(process.stdout),
@@ -183,6 +198,15 @@ async def shell_op(cmd, env=None, cwd=None, cmd_name="") -> int:
     if exit_code != 0:
         raise Exception(f"'{cmd_name}' failed with exit code {exit_code}")
     return exit_code
+
+
+def cleanup():
+    """Kill any remaining child processes"""
+    current_process = psutil.Process(os.getpid())
+    children = current_process.children(recursive=True)
+    for child in children:
+        logging.info(f"Killing process: {child.pid}")
+        child.kill()
 
 
 # -----------------------------------------
@@ -215,12 +239,15 @@ def main():
     run_transform = run_all or args.transform
 
     # Run the main ingest flow
-    asyncio.run(
-        run_pipeline(
-            run_ingest=run_ingest,
-            run_transform=run_transform,
+    try:
+        asyncio.run(
+            run_pipeline(
+                run_ingest=run_ingest,
+                run_transform=run_transform,
+            )
         )
-    )
+    finally:
+        cleanup()
 
 
 if __name__ == "__main__":

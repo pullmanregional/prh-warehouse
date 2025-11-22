@@ -23,7 +23,7 @@ jobs:
           set -a; source .env.${PRW_ENV}
 
           # Run script
-          uv run python ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_FINANCE_ENCRYPTED_DB_FILE}" --kv "${PRH_FINANCE_ENCRYPTED_JSON_FILE}" --key "${PRH_FINANCE_DATA_KEY}" --s3url "${S3_DATASET_URL}" --s3auth "${S3_DATASET_AUTH}"
+          uv run python ingest_datamart.py --prw "${PRW_CONN}" --out "${PRH_FINANCE_ENCRYPTED_DB_FILE}" --key "${PRH_FINANCE_DATA_KEY}" --s3url "${S3_DATASET_URL}" --s3auth "${S3_DATASET_AUTH}"
         env:
           PRW_ENV: ${{ env.PRW_ENV || 'prod' }}
           PRW_HOME: ${{ env.PRW_HOME || '.' }}

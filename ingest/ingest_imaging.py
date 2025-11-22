@@ -21,7 +21,8 @@ DATASET_ID = "imaging"
 # -------------------------------------------------------
 # Logging configuration
 SHOW_SQL_IN_LOG = False
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------
@@ -36,7 +37,7 @@ def sanity_check_files(filename: str):
     if not os.path.isfile(filename):
         error = f"ERROR: source file does not exist: {filename}"
     if error is not None:
-        logging.error(error)
+        logger.error(error)
 
     return error is None
 
@@ -45,7 +46,7 @@ def read_imaging(csv_file: str):
     # -------------------------------------------------------
     # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {csv_file}")
+    logger.info(f"Reading {csv_file}")
     df = pd.read_csv(
         csv_file,
         dtype={
@@ -118,14 +119,14 @@ def main():
     args = parse_arguments()
     in_path = args.input
     output_conn = args.prw
-    logging.info(f"Input: {in_path}, output: {mask_conn_pw(output_conn)}")
+    logger.info(f"Input: {in_path}, output: {mask_conn_pw(output_conn)}")
 
     # Input files
     imaging_file = os.path.join(in_path, "imaging.csv")
 
     # Sanity check the input file
     if not sanity_check_files(imaging_file):
-        logging.error("ERROR: input error (see above). Terminating.")
+        logger.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
     # Read source file into memory
@@ -137,12 +138,12 @@ def main():
     # Get connection to output DBs
     prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
-        logging.error("ERROR: cannot open output DB (see above). Terminating.")
+        logger.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
     prw_session = Session(prw_engine)
 
     # Create tables if they do not exist
-    logging.info("Creating tables")
+    logger.info("Creating tables")
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
     # Write into DB
@@ -162,7 +163,7 @@ def main():
     prw_session.close()
     prw_engine.dispose()
 
-    logging.info("Done")
+    logger.info("Done")
 
 
 if __name__ == "__main__":

@@ -24,7 +24,8 @@ DATASET_ID = "notes"
 # -------------------------------------------------------
 # Logging configuration
 SHOW_SQL_IN_LOG = False
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------
@@ -39,7 +40,7 @@ def sanity_check_files(notes_inpt_ed_file: str):
     if not os.path.isfile(notes_inpt_ed_file):
         error = f"ERROR: notes_inpt_ed file does not exist: {notes_inpt_ed_file}"
     if error is not None:
-        logging.error(error)
+        logger.error(error)
 
     return error is None
 
@@ -59,7 +60,7 @@ def read_notes_inpt(csv_file: str):
     # -------------------------------------------------------
     # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {csv_file}")
+    logger.info(f"Reading {csv_file}")
     df = pd.read_csv(
         csv_file,
         dtype={
@@ -117,7 +118,7 @@ def calc_encounter_age(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate age in years at service date of note
     """
-    logging.info("Calculating patient ages at note date")
+    logger.info("Calculating patient ages at note date")
 
     # Get dob and service_dates
     dates_df = df[["dob", "service_date"]]
@@ -162,7 +163,7 @@ def update_id_tables(prw_id_engine, new_ids_df: pd.DataFrame):
     """
     Update the prw_id and prw_id_details tables with new mappings and PHI.
     """
-    logging.info(f"Writing {len(new_ids_df)} new PRW IDs")
+    logger.info(f"Writing {len(new_ids_df)} new PRW IDs")
     with Session(prw_id_engine) as prw_id_session:
         prw_id_model.PrwIdModel.metadata.create_all(prw_id_engine)
 
@@ -203,7 +204,7 @@ def main():
     in_path = args.input
     output_conn = args.prw
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
-    logging.info(
+    logger.info(
         f"Input: {in_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
     )
 
@@ -212,7 +213,7 @@ def main():
 
     # Sanity check the input file
     if not sanity_check_files(notes_inpt_ed_file):
-        logging.error("ERROR: input error (see above). Terminating.")
+        logger.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
     # If ID DB is specified, read existing ID mappings
@@ -220,14 +221,14 @@ def main():
     if id_output_conn:
         prw_id_engine = get_db_connection(id_output_conn, echo=SHOW_SQL_IN_LOG)
         if prw_id_engine is None:
-            logging.error("ERROR: cannot open ID DB (see above). Terminating.")
+            logger.error("ERROR: cannot open ID DB (see above). Terminating.")
             exit(1)
         if inspect(prw_id_engine).has_table(prw_id_model.PrwId.__tablename__):
-            logging.info("Using existing MRN to PRW ID mappings")
+            logger.info("Using existing MRN to PRW ID mappings")
             mrn_to_prw_id_df = read_mrn_to_prw_id_table(prw_id_engine)
         else:
             mrn_to_prw_id_df = pd.DataFrame(columns=["prw_id", "mrn"])
-            logging.info("ID DB table does not exist, will generate new ID mappings")
+            logger.info("ID DB table does not exist, will generate new ID mappings")
 
     # Read source file into memory
     notes_inpt_ed_df = read_notes_inpt(notes_inpt_ed_file)
@@ -243,12 +244,12 @@ def main():
     # Get connection to output DBs
     prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
-        logging.error("ERROR: cannot open output DB (see above). Terminating.")
+        logger.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
     prw_session = Session(prw_engine)
 
     # Create tables if they do not exist
-    logging.info("Creating tables")
+    logger.info("Creating tables")
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
     # Write into DB
@@ -274,7 +275,7 @@ def main():
         update_id_tables(prw_id_engine, new_ids_df)
         prw_id_engine.dispose()
 
-    logging.info("Done")
+    logger.info("Done")
 
 
 if __name__ == "__main__":

@@ -25,7 +25,8 @@ DATASET_ID = "patients"
 # -------------------------------------------------------
 # Logging configuration
 SHOW_SQL_IN_LOG = False
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------
@@ -51,7 +52,7 @@ def sanity_check_files(patients_file, mychart_file, allergy_file, problem_list_f
     elif not os.path.isfile(problem_list_file) or line_count(problem_list_file) < 10000:
         error = f"ERROR: invalid problem list file: {problem_list_file}"
     if error is not None:
-        print(error)
+        logger.error(error)
 
     return error is None
 
@@ -60,7 +61,7 @@ def read_patients(csv_file: str):
     # -------------------------------------------------------
     # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {csv_file}")
+    logger.info(f"Reading {csv_file}")
     patients_df = pd.read_csv(
         csv_file,
         skiprows=1,
@@ -104,7 +105,7 @@ def read_allergy(allergy_file: str, mrn_to_prw_id_df: pd.DataFrame):
     """
     Read allergy file and add info into patients_df
     """
-    logging.info(f"Reading {allergy_file}")
+    logger.info(f"Reading {allergy_file}")
     allergy_df = pd.read_csv(
         allergy_file,
         skiprows=1,
@@ -138,7 +139,7 @@ def read_problem_list(problem_list_file: str, mrn_to_prw_id_df: pd.DataFrame):
     """
     Read problem lists file and add info into patients_df
     """
-    logging.info(f"Reading {problem_list_file}")
+    logger.info(f"Reading {problem_list_file}")
     problem_list_df = pd.read_csv(
         problem_list_file,
         skiprows=1,
@@ -217,7 +218,7 @@ def calc_patient_age(patients_df: pd.DataFrame):
     Calculate age and age_in_mo_under_3 from dob
     """
     # Calculate age and age in months (if <3yo) from dob
-    logging.info("Calculating patient ages")
+    logger.info("Calculating patient ages")
     now = pd.Timestamp.now()
 
     # Get dob as datetime
@@ -247,7 +248,7 @@ def partition_phi(patients_df: pd.DataFrame):
     """
     Partition patients_df into PHI, which will be stored in ID DB, and non-PHI, which will be stored in the main DB
     """
-    logging.info("Partitioning PHI")
+    logger.info("Partitioning PHI")
     PHI_COLUMNS = [
         "mrn",
         "name",
@@ -296,10 +297,10 @@ def main():
     output_conn = args.prw
     id_output_conn = args.prwid
     drop_tables = args.drop
-    logging.info(
+    logger.info(
         f"Input: {in_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn)}"
     )
-    logging.info(f"Drop tables before writing: {drop_tables}")
+    logger.info(f"Drop tables before writing: {drop_tables}")
 
     # Input files
     patients_file = os.path.join(in_path, "patients.csv")
@@ -311,7 +312,7 @@ def main():
     if not sanity_check_files(
         patients_file, mychart_file, allergy_file, problem_list_file
     ):
-        logging.error("ERROR: input error (see above). Terminating.")
+        logger.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
     # Read source file into memory
@@ -335,24 +336,24 @@ def main():
     prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     prw_id_engine = get_db_connection(id_output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
-        logging.error("ERROR: cannot open output DB (see above). Terminating.")
+        logger.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
     if prw_id_engine is None:
-        logging.error("ERROR: cannot open ID DB (see above). Terminating.")
+        logger.error("ERROR: cannot open ID DB (see above). Terminating.")
         exit(1)
     prw_session = Session(prw_engine)
     prw_id_session = Session(prw_id_engine)
 
     # Drop tables so DDL is reissued if requested
     if drop_tables:
-        logging.info("Dropping existing tables")
+        logger.info("Dropping existing tables")
         prw_model.PrwPatient.__table__.drop(prw_engine, checkfirst=True)
         prw_model.PrwMyChart.__table__.drop(prw_engine, checkfirst=True)
         prw_id_model.PrwId.__table__.drop(prw_id_engine, checkfirst=True)
         prw_id_model.PrwIdDetails.__table__.drop(prw_id_engine, checkfirst=True)
 
     # Create tables if they do not exist
-    logging.info("Creating tables")
+    logger.info("Creating tables")
     prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)
     prw_id_model.PrwIdModel.metadata.create_all(prw_id_engine)
@@ -377,7 +378,7 @@ def main():
     prw_engine.dispose()
 
     # Write ID data to separate DB
-    logging.info("Writing ID data")
+    logger.info("Writing ID data")
     clear_tables_and_insert_data(
         prw_id_session,
         [
@@ -391,7 +392,7 @@ def main():
     prw_id_session.close()
     prw_id_engine.dispose()
 
-    logging.info("Done")
+    logger.info("Done")
 
 
 if __name__ == "__main__":

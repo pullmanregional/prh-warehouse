@@ -22,7 +22,8 @@ DATASET_ID = "charges"
 # -------------------------------------------------------
 # Logging configuration
 SHOW_SQL_IN_LOG = False
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------
@@ -37,7 +38,7 @@ def sanity_check_files(charges_files: list[str]) -> bool:
     if len(charges_files) == 0:
         error = f"ERROR: no charges files found"
     if error is not None:
-        logging.error(error)
+        logger.error(error)
 
     return error is None
 
@@ -57,7 +58,7 @@ def read_charges(csv_file: str):
     # -------------------------------------------------------
     # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {csv_file}")
+    logger.info(f"Reading {csv_file}")
     df = pd.read_csv(
         csv_file,
         dtype={
@@ -133,7 +134,7 @@ def read_rvu_mappings(rvu_mapping_path: str) -> pd.DataFrame:
     if len(cms_rvu_files) == 0:
         return None
     cms_rvu_file = max(cms_rvu_files, key=os.path.getmtime)
-    logging.info(f"Using CMS RVU file: {cms_rvu_file}")
+    logger.info(f"Using CMS RVU file: {cms_rvu_file}")
 
     # Supplemental RVU mapping file from data provided from Samaritan. This file is currently manually
     # exported from the Excel worksheet with the same name in "EpicReports/SamaritanExternal/Rev_by_Rev_Code/MASTER CDM Report 120423.xlsx"
@@ -226,7 +227,7 @@ def update_id_tables(prw_id_engine, new_ids_df: pd.DataFrame):
     """
     Update the prw_id and prw_id_details tables with new mappings and PHI.
     """
-    logging.info(f"Writing {len(new_ids_df)} new PRW IDs")
+    logger.info(f"Writing {len(new_ids_df)} new PRW IDs")
     with Session(prw_id_engine) as prw_id_session:
         prw_id_model.PrwIdModel.metadata.create_all(prw_id_engine)
 
@@ -280,63 +281,63 @@ def main():
     output_conn = args.prw
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
     rvu_mapping_path = args.rvu_mapping
-    logging.info(
+    logger.info(
         f"Input: {in_path} / {rvu_mapping_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn or 'None')}"
     )
 
     # Input files
     charges_files = util.find_data_files(in_path)
     if args.backfill:
-        logging.info(f"Processing all files: {charges_files}")
+        logger.info(f"Processing all files: {charges_files}")
     else:
         charges_files = sorted(charges_files)[-2:]
-        logging.info(
+        logger.info(
             f"Incremental mode: processing only the last 2 files: {charges_files}"
         )
 
     # Sanity check the input files
     if not sanity_check_files(charges_files):
-        logging.error("ERROR: input error (see above). Terminating.")
+        logger.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
     # Read RVU mapping file if provided
     rvu_mappings_df = None
     if rvu_mapping_path:
-        logging.info(f"Using RVU mappings from: {rvu_mapping_path}")
+        logger.info(f"Using RVU mappings from: {rvu_mapping_path}")
         rvu_mappings_df = read_rvu_mappings(rvu_mapping_path)
     if rvu_mappings_df is None:
-        logging.info(f"No RVU mappings found. Will use tRVUs from Epic.")
+        logger.info(f"No RVU mappings found. Will use tRVUs from Epic.")
 
     # If ID DB is specified, read existing ID mappings
     prw_id_engine, mrn_to_prw_id_df = None, None
     if id_output_conn:
         prw_id_engine = get_db_connection(id_output_conn, echo=SHOW_SQL_IN_LOG)
         if prw_id_engine is None:
-            logging.error("ERROR: cannot open ID DB (see above). Terminating.")
+            logger.error("ERROR: cannot open ID DB (see above). Terminating.")
             exit(1)
         if inspect(prw_id_engine).has_table(prw_id_model.PrwId.__tablename__):
-            logging.info("Using existing MRN to PRW ID mappings")
+            logger.info("Using existing MRN to PRW ID mappings")
             mrn_to_prw_id_df = read_mrn_to_prw_id_table(prw_id_engine)
         else:
             mrn_to_prw_id_df = pd.DataFrame(columns=["prw_id", "mrn"])
-            logging.info("ID DB table does not exist, will generate new ID mappings")
+            logger.info("ID DB table does not exist, will generate new ID mappings")
 
     # Get connection to output DBs
     prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
-        logging.error("ERROR: cannot open output DB (see above). Terminating.")
+        logger.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
     prw_session = Session(prw_engine)
 
     # Create tables if they do not exist
-    logging.info("Creating tables")
+    logger.info("Creating tables")
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
     # Process each source file
     all_new_ids_df = pd.DataFrame(columns=["prw_id", "mrn"])
 
     for charges_file in charges_files:
-        logging.info(f"Processing file: {charges_file}")
+        logger.info(f"Processing file: {charges_file}")
 
         # Read source file into memory
         charges_df = read_charges(charges_file)
@@ -370,8 +371,8 @@ def main():
     # from the source data directly in ingest_patients.py. Output warning instead
     # of doing update_id_tables().
     if prw_id_engine and not all_new_ids_df.empty:
-        logging.warning(
-            f"WARNING: Missing PRW IDs were created", all_new_ids_df.to_string()
+        logger.warning(
+            f"WARNING: Missing PRW IDs were created:\n{all_new_ids_df.to_string()}"
         )
 
     # Update last ingest time and modified times for source data files
@@ -388,7 +389,7 @@ def main():
     if prw_id_engine:
         prw_id_engine.dispose()
 
-    logging.info("Done")
+    logger.info("Done")
 
 
 if __name__ == "__main__":

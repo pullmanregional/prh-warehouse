@@ -20,7 +20,8 @@ from prw_common.db_utils import (
 DATASET_ID = "patient_panel"
 
 # Logging definitions
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 SHOW_SQL_IN_LOG = False
 
 
@@ -45,7 +46,7 @@ def read_source_tables(session: Session) -> SrcData:
     """
     Read source tables from the warehouse DB
     """
-    logging.info("Reading source tables")
+    logger.info("Reading source tables")
     patients_df = pd.read_sql_table("prw_patients", session.bind)
     encounters_df = pd.read_sql_table("prw_encounters_outpt", session.bind)
 
@@ -146,7 +147,7 @@ def transform_add_peds_panels(src: SrcData):
     """
     Add panel data (panel_location, panel_provider) to patients_df in place
     """
-    logging.info("Adding panel information for peds")
+    logger.info("Adding panel information for peds")
     patients_df, encounters_df = src.patients_df, src.encounters_df
 
     # Filter out patients that already have a panel provider or location
@@ -205,7 +206,7 @@ def transform_add_peds_panels(src: SrcData):
     all_by_patient = dict(list(encounters_df.groupby("prw_id")))
 
     # Process rule 1 for all patients
-    logging.info("Calculating rule 1")
+    logger.info("Calculating rule 1")
     for i, prw_id in enumerate(patient_ids):
         if prw_id in recent_by_patient:
             patient_encounters = recent_by_patient[prw_id]
@@ -222,10 +223,10 @@ def transform_add_peds_panels(src: SrcData):
                         results_df["prw_id"] == prw_id, "assignment_details"
                     ] = "Rule 1: At least 3 visits in the last 2 years, and the last 3 were at peds"
                     assigned_ids.add(prw_id)
-    logging.info(f"Rule 1 assignments: {results_df['meets_rule_1'].sum()}")
+    logger.info(f"Rule 1 assignments: {results_df['meets_rule_1'].sum()}")
 
     # Process rule 2 for all patients
-    logging.info("Calculating rule 2")
+    logger.info("Calculating rule 2")
     for i, prw_id in enumerate(patient_ids):
         if prw_id in assigned_ids:
             continue
@@ -253,10 +254,10 @@ def transform_add_peds_panels(src: SrcData):
                             results_df["prw_id"] == prw_id, "assignment_details"
                         ] = "Rule 2: Last well visit was in the last 2 years AND it was at peds AND at least one of the last 3 visits was at peds"
                         assigned_ids.add(prw_id)
-    logging.info(f"Rule 2 assignments: {results_df['meets_rule_2'].sum()}")
+    logger.info(f"Rule 2 assignments: {results_df['meets_rule_2'].sum()}")
 
     # Process rule 3 for all patients
-    logging.info("Calculating rule 3")
+    logger.info("Calculating rule 3")
     for i, prw_id in enumerate(patient_ids):
         if prw_id in assigned_ids:
             continue
@@ -285,10 +286,10 @@ def transform_add_peds_panels(src: SrcData):
                                 results_df["prw_id"] == prw_id, "assignment_details"
                             ] = "Rule 3: No well visit in 2 years AND at least 3 visits in the last 1 year AND majority with peds AND at least one of the last 3 visits was at peds"
                             assigned_ids.add(prw_id)
-    logging.info(f"Rule 3 assignments: {results_df['meets_rule_3'].sum()}")
+    logger.info(f"Rule 3 assignments: {results_df['meets_rule_3'].sum()}")
 
     # Process rule 4 for all patients
-    logging.info("Calculating rule 4")
+    logger.info("Calculating rule 4")
     # Create a Series mapping prw_id to age for faster lookup
     age_map = patients_df.set_index("prw_id")["age"]
 
@@ -305,7 +306,7 @@ def transform_add_peds_panels(src: SrcData):
                     results_df.loc[
                         results_df["prw_id"] == prw_id, "should_exclude_rule_4"
                     ] = True
-    logging.info(f"Rule 4 exclusions: {results_df['should_exclude_rule_4'].sum()}")
+    logger.info(f"Rule 4 exclusions: {results_df['should_exclude_rule_4'].sum()}")
 
     # Combine all rules to get final empaneled patients
     results_df["should_empanel"] = (
@@ -329,7 +330,7 @@ def transform_add_peds_panels(src: SrcData):
         details_df, on="prw_id", how="left"
     )
 
-    logging.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
+    logger.info(f"Added {len(empaneled_patients)} pediatric panel assignments")
     print(
         "\nPeds Data Sample:\n-----------------------------------------------------------------------------------\n",
         src.patients_df[src.patients_df["panel_location"].notna()][
@@ -352,7 +353,7 @@ def transform_add_other_panels(src: SrcData):
             provider can be determined) - Assigned to the provider who performed the last well exam
     4th Cut Patients who have seen multiple providers - Assigned to the last provider seen
     """
-    logging.info("Adding panel information")
+    logger.info("Adding panel information")
     patients_df, encounters_df = src.patients_df, src.encounters_df
 
     # Filter out patients and encounters that already have a panel provider or location
@@ -365,7 +366,7 @@ def transform_add_other_panels(src: SrcData):
     ]
 
     # Initialize panel columns
-    logging.info(f"Number of unassigned patients: {len(unassigned_patients_df)}")
+    logger.info(f"Number of unassigned patients: {len(unassigned_patients_df)}")
 
     # Filter to encounters in the past 2 years
     two_years_ago = pd.Timestamp.now() - pd.DateOffset(years=2)
@@ -404,7 +405,7 @@ def transform_add_other_panels(src: SrcData):
         patient_provider_counts["provider_count"] > 1
     ]
     majority_assignments = []
-    logging.info(f"1st cut assignments: {len(single_provider_assignments)}")
+    logger.info(f"1st cut assignments: {len(single_provider_assignments)}")
 
     for patient_id in multi_provider_patients["prw_id"]:
         patient_visits = provider_counts[provider_counts["prw_id"] == patient_id]
@@ -426,7 +427,7 @@ def transform_add_other_panels(src: SrcData):
     majority_assignments_df["assignment_details"] = (
         "2nd cut: Patients with a majority provider"
     )
-    logging.info(f"2nd cut assignments: {len(majority_assignments_df)}")
+    logger.info(f"2nd cut assignments: {len(majority_assignments_df)}")
 
     # 3rd Cut: Assign to provider of last well visit for remaining patients
     patients_after_2nd_cut = multi_provider_patients[
@@ -447,7 +448,7 @@ def transform_add_other_panels(src: SrcData):
     last_well_assignments["assignment_details"] = (
         "3rd cut: Assign to provider of last well visit"
     )
-    logging.info(f"3rd cut assignments: {len(last_well_assignments)}")
+    logger.info(f"3rd cut assignments: {len(last_well_assignments)}")
 
     # 4th Cut: Assign remaining patients to last provider seen
     patients_after_3rd_cut = patients_after_2nd_cut[
@@ -466,7 +467,7 @@ def transform_add_other_panels(src: SrcData):
     last_provider_seen["assignment_details"] = (
         "4th cut: Assign remaining patients to last provider seen"
     )
-    logging.info(f"4th cut assignments: {len(last_provider_seen)}")
+    logger.info(f"4th cut assignments: {len(last_provider_seen)}")
 
     # Combine all assignments
     all_assignments = pd.concat(
@@ -477,7 +478,7 @@ def transform_add_other_panels(src: SrcData):
             last_provider_seen,
         ]
     )
-    logging.info(
+    logger.info(
         f"Total assignments: {len(all_assignments)} {len(all_assignments)/len(unassigned_patients_df)*100:.2f}%"
     )
 
@@ -534,7 +535,7 @@ def main():
     args = parse_arguments()
     db_url = args.prw
 
-    logging.info(f"Using PRW DB: {mask_conn_pw(db_url)}")
+    logger.info(f"Using PRW DB: {mask_conn_pw(db_url)}")
 
     # Get connection to DB
     prw_engine = get_db_connection(db_url, echo=SHOW_SQL_IN_LOG)
@@ -562,7 +563,7 @@ def main():
     out = keep_panel_data(src)
 
     # Create tables if they do not exist
-    logging.info("Creating tables")
+    logger.info("Creating tables")
     PrwMetaModel.metadata.create_all(prw_engine)
     PrwPatientPanel.metadata.create_all(prw_engine)
 
@@ -581,7 +582,7 @@ def main():
     prw_session.commit()
     prw_session.close()
     prw_engine.dispose()
-    logging.info("Done")
+    logger.info("Done")
 
 
 if __name__ == "__main__":

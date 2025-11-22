@@ -21,7 +21,8 @@ DATASET_ID = "encounters"
 # -------------------------------------------------------
 # Logging configuration
 SHOW_SQL_IN_LOG = False
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------
@@ -66,7 +67,7 @@ def read_encounters(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     # -------------------------------------------------------
     # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {csv_file}")
+    logger.info(f"Reading {csv_file}")
     df = pd.read_csv(
         csv_file,
         skiprows=1,
@@ -173,7 +174,7 @@ def read_encounters_ed(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     # -------------------------------------------------------
     # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {csv_file}")
+    logger.info(f"Reading {csv_file}")
     df = pd.read_csv(
         csv_file,
         header=0,
@@ -222,7 +223,7 @@ def read_encounters_ed(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     # Validate that all rows have a prw_id
     null_prw_id_rows = df[df["prw_id"].isnull()][["mrn", "ArrivalInstant"]]
     if not null_prw_id_rows.empty:
-        logging.error(f"Rows with null prw_id: {null_prw_id_rows}")
+        logger.error(f"Rows with null prw_id: {null_prw_id_rows}")
 
     return df
 
@@ -231,7 +232,7 @@ def read_encounters_inpt(csv_file: str, mrn_to_prw_id_df: pd.DataFrame = None):
     # -------------------------------------------------------
     # Extract data from CSV file
     # -------------------------------------------------------
-    logging.info(f"Reading {csv_file}")
+    logger.info(f"Reading {csv_file}")
     df = pd.read_csv(
         csv_file,
         header=0,
@@ -282,7 +283,7 @@ def calc_age_at_encounter(encounters_df: pd.DataFrame, mrn_to_prw_id_df: pd.Data
     """
     Calculate encounter age and encounter_age_in_mo_under_3 based on encounter_date and patient's DOB
     """
-    logging.info("Calculating patient ages at encounter")
+    logger.info("Calculating patient ages at encounter")
     # Get each patient's DOB
     encounters_df = encounters_df.merge(
         mrn_to_prw_id_df[["prw_id", "dob"]], on="prw_id", how="left"
@@ -344,7 +345,7 @@ def fix_missing_los_cpt(encounters_df: pd.DataFrame):
         # Update the level_of_service column with the extracted codes
         encounters_df.loc[mask, "level_of_service"] = extracted_codes
 
-    logging.info(f"Updated {count} encounter LOS values")
+    logger.info(f"Updated {count} encounter LOS values")
     return encounters_df
 
 
@@ -375,10 +376,10 @@ def main():
     output_conn = args.prw
     id_output_conn = args.prwid if args.prwid.lower() != "none" else None
     drop_tables = args.drop
-    logging.info(
+    logger.info(
         f"Input: {in_path}, output: {mask_conn_pw(output_conn)}, id output: {mask_conn_pw(id_output_conn)}"
     )
-    logging.info(f"Drop tables before writing: {drop_tables}")
+    logger.info(f"Drop tables before writing: {drop_tables}")
 
     # Input files
     encounters_file = os.path.join(in_path, "encounters.csv")
@@ -388,13 +389,13 @@ def main():
     if not sanity_check_files(
         encounters_file, encounters_ed_file, encounters_inpt_file
     ):
-        logging.error("ERROR: input error (see above). Terminating.")
+        logger.error("ERROR: input error (see above). Terminating.")
         exit(1)
 
     # Read existing ID mappings
     prw_id_engine = get_db_connection(id_output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_id_engine is None:
-        logging.error("ERROR: cannot open ID DB (see above). Terminating.")
+        logger.error("ERROR: cannot open ID DB (see above). Terminating.")
         exit(1)
     mrn_to_prw_id_df = read_mrn_to_prw_id_table(prw_id_engine)
 
@@ -411,16 +412,16 @@ def main():
     # Get connection to output DBs
     prw_engine = get_db_connection(output_conn, echo=SHOW_SQL_IN_LOG)
     if prw_engine is None:
-        logging.error("ERROR: cannot open output DB (see above). Terminating.")
+        logger.error("ERROR: cannot open output DB (see above). Terminating.")
         exit(1)
     prw_session = Session(prw_engine)
 
     # Drop tables so DDL is reissued if requested
     if drop_tables:
-        logging.info("Dropping existing tables")
+        logger.info("Dropping existing tables")
         prw_model.PrwEncounterOutpt.__table__.drop(prw_engine, checkfirst=True)
 
-    logging.info("Creating tables")
+    logger.info("Creating tables")
     prw_model.PrwMetaModel.metadata.create_all(prw_engine)
     prw_model.PrwModel.metadata.create_all(prw_engine)
 
@@ -442,7 +443,7 @@ def main():
     prw_session.commit()
     prw_session.close()
     prw_engine.dispose()
-    logging.info("Done")
+    logger.info("Done")
 
 
 if __name__ == "__main__":

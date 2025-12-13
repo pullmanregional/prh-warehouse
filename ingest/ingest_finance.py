@@ -276,10 +276,10 @@ def main():
 
     # Read income statement and hours data
     income_stmt_df = parse.read_income_stmt_data(income_stmt_files)
-    historical_hours_df = parse.read_historical_hours_and_fte_data(
+    historical_hours_df = parse.read_historical_hours_and_payroll_data(
         historical_hours_file, HISTORICAL_HOURS_YEAR
     )
-    hours_by_pay_period_df = parse.read_hours_and_fte_data(hours_files)
+    hours_by_pay_period_df = parse.read_hours_and_payroll_data(hours_files)
     hours_by_pay_period_df = pd.concat([historical_hours_df, hours_by_pay_period_df])
 
     # # Read balance sheets
@@ -318,7 +318,9 @@ def main():
             TableData(table=PrwUOS, df=uos_df),
             TableData(table=PrwBudget, df=budget_df),
             TableData(table=PrwHoursByPayPeriod, df=hours_by_pay_period_df),
+            TableData(table=PrwPayrollByPayPeriod, df=hours_by_pay_period_df),
             TableData(table=PrwHours, df=hours_by_month_df),
+            TableData(table=PrwPayroll, df=hours_by_month_df),
             TableData(table=PrwContractedHours, df=contracted_hours_df),
             TableData(table=PrwIncomeStmt, df=income_stmt_df),
             TableData(table=PrwAgedAR, df=aged_ar_df),

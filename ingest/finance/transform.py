@@ -49,6 +49,7 @@ def _copy_fraction_of_hours_row(df_row, data, date, fraction):
         "prod_hrs",
         "nonprod_hrs",
         "total_hrs",
+        "total_amt",
     ]:
         # Multiply the pay period value by portion of the period in this month
         data_row[col] = data_row.get(col, 0) + df_row[col] * fraction

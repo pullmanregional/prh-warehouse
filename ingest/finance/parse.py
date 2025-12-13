@@ -427,13 +427,13 @@ def read_income_stmt_data(files):
     return pd.concat(ret)
 
 
-def read_historical_hours_and_fte_data(filename, year):
+def read_historical_hours_and_payroll_data(filename, year):
     """
-    Read historical hours/FTE data from the custom formatted Excel workbook
+    Read historical hours, FTE and payroll dollars data from the custom formatted Excel workbook
     """
     # Extract data from first and only worksheet
     logging.info(f"Reading {filename}")
-    xl_data = pd.read_excel(filename, header=None, usecols="A,B,C,D,G,M,N,AB")
+    xl_data = pd.read_excel(filename, header=None, usecols="A,B,C,D,G,M,N,Z,AB")
 
     # Loop over tables in worksheet, each one representing a pay period
     ret = []
@@ -463,6 +463,7 @@ def read_historical_hours_and_fte_data(filename, year):
             "prod_hrs",
             "nonprod_hrs",
             "total_hrs",
+            "total_amt",
             "total_fte",
         ]
 
@@ -502,6 +503,7 @@ def read_historical_hours_and_fte_data(filename, year):
                     "prod_hrs",
                     "nonprod_hrs",
                     "total_hrs",
+                    "total_amt",
                     "total_fte",
                 ]
             ]
@@ -513,9 +515,9 @@ def read_historical_hours_and_fte_data(filename, year):
     return df
 
 
-def read_hours_and_fte_data(files):
+def read_hours_and_payroll_data(files):
     """
-    Read and combine data from per-month Excel workbooks for productive vs non-productive hours and total FTE
+    Read and combine data from per-month Excel workbooks for productive vs non-productive hours, total FTE, and payroll dollars
     """
     # There is a PP#n YYYY Payroll_Productivity_by_Cost_Center.xlsx file for each pay period
     ret = []
@@ -533,14 +535,28 @@ def read_hours_and_fte_data(files):
         dept_num_col_idx = hours_df.columns.get_loc("Department Number")
         hours_df = hours_df.iloc[:, dept_num_col_idx:]
 
-        # Rename subsequent columns after Department Number and Department Name
-        hours_df.columns.values[2] = "reg_hrs"
-        hours_df.columns.values[3] = "CALLBK - CALLBACK"
-        hours_df.columns.values[4] = "DBLTME - DOUBLETIME"
-        hours_df.columns.values[6] = "OT_1.5 - OVERTIME"
+        # Rename subsequent columns after Department Number and Department Name using the sub-headers in the 1st row
+        hours_df.columns.values[2] = hours_df.iloc[0, 2]  # "Regular Hours"
+        hours_df.columns.values[3] = hours_df.iloc[0, 3]  # "CALLBK - CALLBACK"
+        hours_df.columns.values[4] = hours_df.iloc[0, 4]  # "DBLTME - DOUBLETIME"
+        hours_df.columns.values[6] = hours_df.iloc[0, 6]  # "OT_1.5 - OVERTIME"
 
-        # Drop next row, which are sub-headers. Find columns by name, because there are
-        # a couple different formats with different columns orders.
+        # Ensure all required columns are present
+        for column in [
+            "Regular Hours",
+            "CALLBK - CALLBACK",
+            "DBLTME - DOUBLETIME",
+            "OT_1.5 - OVERTIME",
+            "Total Productive Hours",
+            "Total Non-Productive Hours",
+            "Total Productive/Non-Productive Hours",
+            "Total Dollars",
+            "Total FTE",
+        ]:
+            if column not in hours_df.columns:
+                raise ValueError(f"Required column {column} not found in {file}")
+
+        # Drop sub-header row
         hours_df = hours_df.loc[1:]
 
         # Read year and pay period number from file name
@@ -575,6 +591,7 @@ def read_hours_and_fte_data(files):
                 "Total Productive Hours": "prod_hrs",
                 "Total Non-Productive Hours": "nonprod_hrs",
                 "Total Productive/Non-Productive Hours": "total_hrs",
+                "Total Dollars": "total_amt",
                 "Total FTE": "total_fte",
             },
             inplace=True,
@@ -590,6 +607,7 @@ def read_hours_and_fte_data(files):
                     "prod_hrs",
                     "nonprod_hrs",
                     "total_hrs",
+                    "total_amt",
                     "total_fte",
                 ]
             ]

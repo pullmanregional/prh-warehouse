@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       payperiod:
-        description: "Pay period number between 1-26"
+        description: "Pay period number between 1-28"
         required: true
         type: string
 
